@@ -1,0 +1,227 @@
+---
+title: "TP2 Estimation de processus stochastiques"
+author: "AGBLODOE Komi / Soheil SALMANI M2 SSD"
+date: "23 janvier 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+Dans ce TP, il s'agit d'estimer les fonctions de covariance de processus gaussiens en calculant leurs variogrammes. Ensuite, on réutilisera cette estimation a???n de générer des données manquantes.
+
+###1
+
+##Tâche 1
+
+On dispose de trois différents jeux de données contenant chacun 10 réalisations.
+Dans un premier temps, Pour chaque jeu de données, il s'agit de tracer le variogramme pour chaque réalisation à partir de la fonction $\gamma(r)$ tout en faisant varier la valeur de r ($0\leq r \leq 0.5$) tout en fixant epsilon le plus petit possible. Ensuite, nous traçons la moyenne de ces 10 variogrammes pour chaque jeu de données.
+
+#Variogrammes
+
+data 1.mat
+```{r}
+library(R.matlab) 
+data <- readMat("C:/Users/im2ag/Desktop/COURS ET TP GEOSTATISTIQUE/data_1.mat")
+x = data$x 
+y = data$y
+X_1 = data$X.1
+X_2 = data$X.2
+X_3 = data$X.3
+X_4 = data$X.4
+X_5 = data$X.5
+X_6 = data$X.6
+X_7 = data$X.7
+X_8 = data$X.8
+X_9 = data$X.9
+X_10 = data$X.10
+X_incomplet = data$X.incomplet
+
+epsilon<-0.05
+
+n <- 32
+S <- data.matrix(expand.grid(x, y))
+dim(S)
+
+Dist = as.matrix(dist(S))
+dim(Dist)
+
+
+r<-seq(0,0.5,0.05)
+variogr<-matrix(0,ncol=length(r),nrow=10)
+
+for(l in 1:10){ 
+  X<-data[[l]]
+  X_vect<-as.vector(X)
+  
+  for(k in 1:length(r)){
+   
+  cond<-which((r[k]-epsilon<=Dist)&(Dist<=r[k]+epsilon), arr.ind = TRUE)
+  
+
+  N2<-nrow(cond) 
+  GAMMA<-rep(NA,N2)
+  for(i in 1:N2){
+    GAMMA[i]<-(X_vect[cond[i,1]]-X_vect[cond[i,2]])^2
+   }
+  
+  GAMMA<-1/(2*N2)*sum(GAMMA)
+  variogr[l,k]<-GAMMA 
+ }
+}
+
+
+plot(r,variogr[1,],ylim=c(min(variogr),max(variogr)),main = "Variogramme du jeu de données data_1.mat")
+for(i in 2:10){
+  points(r,variogr[i,], lwd=2,col=rainbow(n=10))
+}
+
+lines(r,apply(variogr,2,mean),type = "l")
+
+```
+
+
+data 2.mat 
+```{r}
+data <- readMat("C:/Users/im2ag/Desktop/COURS ET TP GEOSTATISTIQUE/data_2.mat")
+x = data$x 
+y = data$y
+X_1 = data$X.1
+X_2 = data$X.2
+X_3 = data$X.3
+X_4 = data$X.4
+X_5 = data$X.5
+X_6 = data$X.6
+X_7 = data$X.7
+X_8 = data$X.8
+X_9 = data$X.9
+X_10 = data$X.10
+X_incomplet = data$X.incomplet
+
+epsilon<-0.05
+
+n <- 32
+S <- data.matrix(expand.grid(x, y))
+dim(S)
+
+Dist = as.matrix(dist(S))
+dim(Dist)
+
+r<-seq(0,1,0.05)
+variogr<-matrix(0,ncol=length(r),nrow=10)
+
+for(l in 1:10){ 
+  X<-data[[l]]
+  X_vect<-as.vector(X)
+  
+  for(k in 1:length(r)){
+   
+  cond<-which((r[k]-epsilon<=Dist)&(Dist<=r[k]+epsilon), arr.ind = TRUE)
+  
+
+  N2<-nrow(cond) 
+  GAMMA<-rep(NA,N2)
+  for(i in 1:N2){
+    GAMMA[i]<-(X_vect[cond[i,1]]-X_vect[cond[i,2]])^2
+   }
+  
+  GAMMA<-1/(2*N2)*sum(GAMMA)
+  variogr[l,k]<-GAMMA 
+ }
+}
+
+
+plot(r,variogr[1,],ylim=c(min(variogr),max(variogr)),main = "Variogramme du jeu de données data_2.mat")
+for(i in 2:10){
+  points(r,variogr[i,], lwd=2,col=rainbow(n=10))
+}
+
+lines(r,apply(variogr,2,mean),type = "l")
+```
+
+
+
+data 3.mat
+```{r}
+data <- readMat("C:/Users/im2ag/Desktop/COURS ET TP GEOSTATISTIQUE/data_3.mat")
+x = data$x 
+y = data$y
+X_1 = data$X.1
+X_2 = data$X.2
+X_3 = data$X.3
+X_4 = data$X.4
+X_5 = data$X.5
+X_6 = data$X.6
+X_7 = data$X.7
+X_8 = data$X.8
+X_9 = data$X.9
+X_10 = data$X.10
+X_incomplet = data$X.incomplet
+
+epsilon<-0.05
+
+n <- 32
+S <- data.matrix(expand.grid(x, y))
+dim(S)
+
+Dist = as.matrix(dist(S))
+dim(Dist)
+
+r<-seq(0,0.5,0.05)
+variogr<-matrix(0,ncol=length(r),nrow=10)
+
+for(l in 1:10){ 
+  X<-data[[l]]
+  X_vect<-as.vector(X)
+  
+  for(k in 1:length(r)){
+   
+  cond<-which((r[k]-epsilon<=Dist)&(Dist<=r[k]+epsilon), arr.ind = TRUE)
+  
+
+  N2<-nrow(cond) 
+  GAMMA<-rep(NA,N2)
+  for(i in 1:N2){
+    GAMMA[i]<-(X_vect[cond[i,1]]-X_vect[cond[i,2]])^2
+   }
+  
+  GAMMA<-1/(2*N2)*sum(GAMMA)
+  variogr[l,k]<-GAMMA 
+ }
+}
+
+
+plot(r,variogr[1,],ylim=c(min(variogr),max(variogr)),main = "Variogramme du jeu de données data_3.mat")
+for(i in 2:10){
+  points(r,variogr[i,], lwd=2,col=rainbow(n=10))
+}
+
+lines(r,apply(variogr,2,mean),type = "l")
+```
+
+#Comment choisir $\epsilon$?
+
+$\epsilon$ ne doit pas être choisi trop petit au risque de n'avoir pas $N_\epsilon(r)$ qui soit nul et en même temps, il doit pas être choisi trop grand non plus afin d'éviter d'avoir un très grand nombre pour $N_\epsilon(r)$. De ce fait, il doit être choisi de manière empirique et en fonction du jeu de données.
+
+
+##Tâche 2
+
+Dans cette partie, il s'agit de retrouver le noyau à partir duquel les données  
+data_1.mat, data_2.mat et data_3.mat ont été obtenues. Les noyaux parmi lesquels l'identification doit être faite sont les suivants: Gaussien, Sphérique+delta et Matern-3/2. 
+
+
+Sur le graphe des variogrammes du jeu de données data_3.mat, on remarque bien que la courbe représentant la moyennne des 10 variogrammes commencent à partir de la valeur 10 contrairement aux courbes représentant les moyennes des variogrammes des jeux de données data_1.mat et data_2.mat. Ceci peut être expliqué par le bruit $\sigma_0$ du noyau Sphérique+delta.
+De ce fait, on estime donc la valeur de $\sigma_0$ à 10. De plus graphiquement, on obtient $a=0.2$ comme portée (la courbe de la moyenne converge à partir de cette valeur) et $\sigma^2=32$ (représentant la valeur atteinte à partir de la portée) environ pour le noyau Sphérique+delta.
+On conclut donc que le jeu de données data_3.mat a été obtenu à partir du noyau Sphérique+delta avec comme paramètres $\sigma_0=10$, $a=0.2$ et $\sigma=\sqrt{32}$.
+
+
+
+Quand au graphe des variogrammes du jeu de données data_1.mat, on remarque bien que la courbe représentant la moyennne des 10 variogrammes ne présente pas assez de variabilité. Ce qui est une caractéristique gaussienne. De plus cette courbe converge à partir de la valeur 0.2. Ce qui représente la valeur de $a$. On obtient de même graphiquement la valeur 1 comme $\sigma^2$.
+On conclut donc que le jeu de données data_1.mat a été obtenu à partir du noyau Gaussien avec comme paramètres $a=0.2$ et $\sigma=1$.
+
+
+
+Pour le jeu de données data_2.mat, nous avons remarqué que la courbe représentant la moyennne des 10 variogrammes ne présente pas assez rapidement de convergence (en prenant $0\leq r \leq 0.5$). Cela ne nous permet pas vraiment de déterminer les paramètres. Ce qui nous a amené à faire varier r de 0 à 1 au lieu de 0 à 0.5. Ce faisant, on remarque que la convergence intervient entre les valeurs 0.5 et 0.6 pour une valeur de $\sigma^2$ approximativement égale à 0.3. Même si nous n'arrivons pas bien à déceler les caractéristiques de manière précise, nous sommes tentés de dire que le jeu de données data_2.mat provient d'un noyau Matérn-3/2 avec comme paramètres $a$ appartenant à l'intervalle [0.5,0.6] et $\sigma=\sqrt{0.3}$.
+

@@ -1,0 +1,97 @@
+---
+title: "TP4 - exercice 2 : compromis performance / sparsité - pénalités Lasso, Ridge et Elastic-Net"
+output: 
+    html_document:
+    number_sections: true
+    fig_width: 4
+    fig_height: 4
+documentclass: article
+author:  Master parcours SSD - UE Fouille de Données
+date: Hiver 2019
+---
+
+
+Dans cet exercice nous allons illustrer le compromis entre performances de prédiction et interprétabilité du modèle que l'on observe fréquemment quand on applique les pénalités Lasso et Ridge à des données de haute dimension (et corrélées) : le Lasso permettant d'obtenir un modèle interprétable, mais la pénalité ridge offrant souvent de meilleures performances de prédiction. Nous illustrerons également que la pénalité elastic-net peut s'avérer intéressante dans ce contexte.
+
+Pour cela nous travaillerons sur le jeu de données **Golub**, un jeu de données fondateur pour l'analyse de données de puces à ADN pour l'oncologie, dont on trouve un descriptif [ici](https://web.stanford.edu/~hastie/CASI_files/DATA/leukemia.html). 
+
+```{r, echo = FALSE}
+# define global chunks options
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+# fix random seed
+set.seed(20)
+```
+
+
+# Question 1. Charger le jeu de données
+Le jeu de données est stocké dans deux fichiers texte **X.txt** et **y.txt** contenant respectivement les observations (72 échantillons en dimension 3571) et les réponses associées (codées ici en -1/1).
+
+```{r}
+# load dataset #
+#--------------#
+```
+
+
+# Question 2. Visualiser les chemins de régularisation des modèles lasso et ridge
+
+```{r, fig.height = 5, fig.width = 10}
+# load package
+library(glmnet)
+
+# fit lasso and ridge #
+#---------------------#
+```
+
+
+# Question 3. Réaliser une expérience de validation croisée en utilisant la fonction cv.glmnet() et afficher les résultats avec la fonction plot.cv.glmnet(). A quoi correspondent les deux droites verticales représentées en pointillés ?
+
+On utilisera l'option $\texttt{type.measure = 'class'}$ pour considérer l'erreur de classification comme critère de performance (se référer à la documentation pour davantage de détails).
+
+```{r, fig.height = 5, fig.width = 10}
+# carry out cross-validation #
+#----------------------------#
+```
+
+
+# Question 4. Afin de mieux interpréter les résultats, représenter sur une même figure l'évolution des performances de validation croisée obtenue par les deux modèles quand le paramètre de régularisation varie. Quel modèle offre les meilleures performances ?
+
+```{r, fig.height = 5}
+# plot average performance #
+#--------------------------#
+```
+
+
+
+# Question 5. Reproduire cette analyse en considérant une penalité elastic-net afin de considérer un compromis entre lasso et ridge. Commenter les résultats.
+
+Il suffit pour cela de modifier le paramètre $\alpha$ de la fonction $\texttt{cv.glmnet()}$ et de le faire varier entre 0 (ridge) et 1 (Lasso, la valeur par défaut).
+On pourra par exemple considérer une grille définie par pas de 0.2.
+
+
+```{r}
+# compute enet solutions #
+#------------------------#
+```
+
+```{r, fig.height = 5}
+# plot #
+#------#
+```
+
+
+# Question 6. Enfin, dresser un bilan des résultats obtenus en représentant l'évolution (1) des meilleures performances de validation croisée et (2) du nombre de variables sélectionnées, en fonction de $\alpha$ . Commenter les résultats. Quelle valeur de  $\alpha$  retiendriez-vous ? Comparer le chemin de régularisation correspondant à celui du lasso.
+
+
+```{r, fig.height = 5, fig.width = 10}
+# extract support and perf #
+#--------------------------#
+```
+
+
+```{r, fig.height = 5, fig.width = 10}
+# show regularization path #
+#--------------------------#
+```
+
+

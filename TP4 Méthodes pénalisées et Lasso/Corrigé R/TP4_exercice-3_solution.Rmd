@@ -1,0 +1,234 @@
+---
+title: "TP4 - exercice 3 : glmnet & digits"
+output: 
+    html_document:
+    number_sections: true
+    fig_width: 4
+    fig_height: 4
+documentclass: article
+author:  Master parcours SSD - UE Fouille de Données
+date: Hiver 2019
+---
+
+Dans cet exercice nous allons illustrer l'utilisation de glmnet et des méthodes pénalisés parcimonieuses pour la classification mutliclasse.
+
+Pour cela nous travaillerons sur le jeu de données ZIP que l'on peut télécharger [ici](https://web.stanford.edu/~hastie/ElemStatLearn/data.html). Comme les jeu digits et MNIST, ce jeu de données contient des imagettes de caractères manuscrits (des chiffres entre 0 et 1), mais avec une taille intermédiaire. Les images sont en effet de taille 16x16 (au lieu de 8x8 ou 28x28), ce qui réduit le temps nécessaire pour réaliser les analyses.
+
+Le jeu de données se constitue d'un ensemble d'apprentissage et d'un ensemble de test, stockés dans les fichiers zip.train et zip.test. Chaque ligne de ces fichiers contient une instance et contient un chiffre entre 0 et 9 dans la 1ère colonne donnant la catégorie, puis les 256 valeurs définissant l'image.
+
+
+
+```{r, echo = FALSE}
+# define global chunks options
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+# fix random seed
+set.seed(20)
+```
+
+
+# Question 1. Charger le jeu de données et représenter quelques images avec le code ci-dessous
+
+NB: pour le TP on réduira même la taille du jeu d'apprentissage par 2 pour que l'exécution soit plus rapide.
+
+
+```{r,fig.height = 10, fig.width = 10}
+# read training data #
+#--------------------#
+tab = read.table("datasets/zip-database/zip.train")
+y.train = factor(tab[,1])
+X.train = as.matrix(tab[,-1])
+
+# reduce size of training data #
+#------------------------------#
+ind.small = sample(length(y.train), round(length(y.train)/2))
+y.train = y.train[ind.small]
+X.train = X.train[ind.small,]
+
+# read test data #
+#----------------#
+tab = read.table("datasets/zip-database/zip.test")
+y.test = factor(tab[,1])
+X.test = as.matrix(tab[,-1])
+cat("size of training data =", nrow(X.train),  "x", ncol(X.train), "\n")
+cat("size of test data =", nrow(X.test),  "x", ncol(X.test), "\n")
+
+# show a few figures #
+#--------------------#
+k = 8
+# pick samples
+ind.sple = sample(length(y.train), size = k*k, replace = FALSE)
+# define colors
+cols = gray(seq(1, 0, length.out = 256))
+# plot
+par(mar = c(1, 1, 1, 1))
+par(mfrow = c(k,k))
+for(i in seq(k*k)){
+  I = matrix(X.train[ind.sple[i],], nrow = 16, byrow = F)
+  image(I, col = cols, axes = F)
+  box()
+}
+```
+
+
+# Question 2. En vue d'un problème de classification binaire visant à reconnaître le 0 des autres chiffres, définir un vecteur binaire (0/1) définissant les caractères 0 comme classe positive.
+```{r}
+y.bin = rep(0, length(y.train))
+y.bin[y.train == 0] = 1
+y.bin = factor(y.bin)
+```
+
+# Question 3. Optimiser un modèle de classification basée sur une régression logistique pénalisé par une norme  L1  (lasso) suivant la procédure suivante : 
+
+1. réaliser une expérience de validation croisée grâce à la fonction $\texttt{cv.glmnet}$. 
+
+2. extraire les prédictions sur le jeu de test obtenues par le modèle défini par le paramètre $\texttt{lambda.1se}$
+
+3. extraire les coefficients du modèle et les représenter sous la forme d'une image, telle que dans la question 1.
+
+On utilisera l'option $\texttt{type.measure = 'class'}$ pour considérer l'erreur de classification comme critère de performance (se référer à la documentation pour davantage de détails).
+
+Notons qu'on peut obtenir les prédictions ainsi que les coefficients  du modèle  via la fonction $\texttt{predict.cv.glmnet}$ (i.e., en appellant la fonction $\texttt{predict}$ à l'objet renvoyé par la fonction $\texttt{cv.glmnet}$) en utilisant les options $\texttt{type='class'}$ (pour les prédictions) ou $\texttt{type='coefficients'}$ (pour les coefficients). Se référer à la documentation pour davantage de détails.
+
+
+On commence  par optimiser le modèle.
+```{r, fig.height = 5, fig.width = 5}
+# load package
+library(glmnet)
+# fit model
+cv.lasso = cv.glmnet(x = X.train, y = y.bin, family = 'binomial', type.measure = "class")
+# plot models
+plot(cv.lasso, main = "cross-validation results - lasso")
+```
+
+On l'évalue sur le jeu de test.
+```{r}
+# generate predictions
+preds = predict(cv.lasso, X.test, s = "lambda.1se", type = "class")
+# show "confusion matrix" : true label (between 0 and 9) and predicted label (0 or 1)
+table(y.test, preds)
+```
+
+On représente les coefficients obtenus.
+```{r, fig.height = 5, fig.width = 5}
+# get coefficients
+coeffs = predict(cv.lasso, X.test, s = "lambda.1se", type = "coefficients")
+intercept = coeffs[1]
+beta = coeffs[-1]
+# show coefficients as matrix
+I = matrix(beta, nrow = 16, byrow = F)
+image(I, col = cols, axes = F)
+box()
+```
+
+
+# Question 4.  Considérer à présent le problème de classification multiclasse en utilisant un modèle multinomial. 
+
+**L'objectif principal de cet exercice étant de visualiser et comparer les modèles obtenus par différentes pénalités, on appliquera par souci de temps la procédure suivante :**
+
+1. construire globalement le modèle (i.e., sans optimiser le paramêtre de régularisation) via la fonction $\texttt{glmnet()}$ en utilisant l'option  $\texttt{family='multinomial'}$. 
+
+2. évaluer ses performances sur les jeux d'apprentissage et de test via la fonction $\texttt{predict.glmnet()}$. 
+
+3. représenter les performances obtenues le long du chemin de régularisation, sur les jeux d'apprentissage et de test.
+
+3. représenter les modèles obtenus pour une "bonne" valeur de lambda : une valeur permettant d'obtenir de bonnes performances de test, tout en restant relativement parcimonieux. La ~40ème valeur de la grille obtenue par défaut devrait être un bon compromis. 
+
+**Bien entendu, la bonne manière de faire consisterait à optimiser le paramètre par validation croisée comme précédemment, et vous êtes tout à fait encouragés à réaliser cette analyse "pour de vrai" chez vous.**
+
+
+On commence par "fitter" le modèle.
+```{r}
+fit.multi = glmnet(x = X.train, y = y.train, family = "multinomial")
+```
+
+On calcule les predictions sur les données d'apprentissage et de test, tout au long du chemin de régularisation.
+```{r}
+preds.train = predict(fit.multi, X.train, type = "class")
+preds.test  = predict(fit.multi, X.test, type = "class")
+cat("size of preds.test =", nrow(preds.test), "x", ncol(preds.test), "\n")
+```
+
+On calcule les taux de bonne classification correspondant et on les représente graphiquement.
+```{r, fig.height = 5, fig.width = 5}
+# compute accuracy
+acc.train = apply(preds.train, 2, function(x){mean(x==y.train)})
+acc.test  = apply(preds.test,  2, function(x){mean(x==y.test)})
+# plot
+plot(seq(acc.train), acc.train, type = "l", ylim = c(0,1), xlab = "lambda index", ylab = "accuracy", main  = "accuracy vs lambda index")
+lines(seq(acc.test), acc.test, type = "l", col = 2)
+grid()
+legend("bottomright", c("training set", "test set"), col = c(1,2), lwd = 1, bg = "white")
+# show model we will consider
+abline(v = 40, lty = 2)
+```
+
+On extrait les coefficients et on les représente
+```{r, fig.height = 10, fig.width = 10}
+# specify which model to select
+ind.select = 40
+# extract coefficients
+B = sapply(fit.multi$beta, function(x){x[,ind.select]})
+# plot
+par(mfrow = c(4,3))
+par(mar = c(1,1,1,1))
+for(i in 1:ncol(B)){
+  I = matrix(B[,i], nrow = 16, byrow = F)
+  image(I, col = cols, axes = F, main = paste("coeffs of class", fit.multi$classnames[i]))
+  box()
+}
+```
+
+# Question 6. Réaliser la même analyse pour le modèle multinomial "groupé", i.e., pénalisé en group-lasso.
+
+Pour cela, il suffit de specifier l'option $\texttt{type.multinomial='grouped'}$ (qui vaut par défaut $\texttt{'ungrouped'}$).
+
+Là aussi, on se contentera de construire le modèle global, d'évaluer les performances train/test et de choisir une valeur de lambda. Ici, la ~30ème valeur de la grille obtenue par défaut devrait être un bon compromis.
+
+
+On "fitte" le modèle.
+```{r}
+fit.group = glmnet(x = X.train, y = y.train, family = "multinomial", type.multinomial = "grouped")
+```
+
+On calcule les predictions sur les données d'apprentissage et de test, tout au long du chemin de régularisation.
+```{r}
+preds.train.group = predict(fit.group, X.train, type = "class")
+preds.test.group  = predict(fit.group, X.test, type = "class")
+```
+
+On calcule les taux de bonne classification correspondant et on les représente graphiquement.
+```{r, fig.height = 5, fig.width = 5}
+# compute accuracy
+acc.train.group = apply(preds.train.group, 2, function(x){mean(x==y.train)})
+acc.test.group  = apply(preds.test.group,  2, function(x){mean(x==y.test)})
+# plot vs previous results
+plot(seq(acc.train), acc.train, type = "l", ylim = c(0,1), xlab = "lambda index", ylab = "accuracy", main  = "accuracy vs lambda index")
+lines(seq(acc.test), acc.test, type = "l", col = 2)
+lines(seq(acc.test), acc.train.group, type = "l", col = 1, lty = 2)
+lines(seq(acc.test), acc.test.group, type = "l", col = 2, lty = 2)
+grid()
+legend("bottomright", c("training set", "test set", "ungrouped", "grouped"), col = c(1,2,"gray","gray"), lwd = 1, lty = c(1,1,1,2), bg = "white")
+# show the model we will consider
+abline(v = 30, lty = 2)
+```
+
+On extrait les coefficients et on les représente. On peut constater que les mêmes coefficients (i.e., pixels) sont actifs ou inactifs pour les différents caractères.
+```{r, fig.height = 10, fig.width = 10}
+# specify which model to select
+ind.select = 30
+# extract coefficients
+B = sapply(fit.group$beta, function(x){x[,ind.select]})
+# plot
+par(mfrow = c(4,3))
+par(mar = c(1,1,1,1))
+for(i in 1:ncol(B)){
+  I = matrix(B[,i], nrow = 16, byrow = F)
+  image(I, col = cols, axes = F, main = paste("coeffs of class", fit.multi$classnames[i]))
+  box()
+}
+```
+
+
+
+

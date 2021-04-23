@@ -1,0 +1,100 @@
+---
+title: "TP4 - exercice 1 : le BA-BA du package glmnet"
+output: 
+    html_document:
+    number_sections: true
+    fig_width: 4
+    fig_height: 4
+documentclass: article
+author:  Master parcours SSD - UE Fouille de Données
+date: Hiver 2019
+---
+
+
+Dans cet exercice nous allons illustrer l'utilisation du package $\texttt{glmnet}$ sur un problème de classification.
+
+Pour cela nous travaillerons sur le jeu de données **South Africa Heart Disease**, utilisé à fins illstratives dans le livre *Elements of Statistical Learning* que l'on peut télécharger sur [cette page](https://web.stanford.edu/~hastie/ElemStatLearn/).
+
+Nous nous limiterons ici à un problème de classification binaire, mettant donc en jeu un modèle de régression logistique, mais [cette vignette](https://web.stanford.edu/~hastie/glmnet/glmnet_alpha.html) illustre l'utilisation du package de manière bien plus complète.
+
+
+
+```{r, echo = FALSE}
+# define global chunks options
+library(knitr)
+opts_chunk$set(tidy.opts=list(width.cutoff=60),tidy=TRUE)
+```
+
+
+# Question 1 : charger le jeu de données
+
+Le jeu de données est contenu dans le fichier **SAheart.data**. Notons que la première colonne du fichier contient le nom des lignes et qu'il convient de les interpréter en tant que telle.
+
+```{r}
+tab = read.csv("datasets/SAheart.data", row.names = 1)
+```
+
+
+# Question 2 : mettre en forme le jeu de données
+
+1. extraire la variable réponse, qui est contenue dans le champ **chd**
+
+2. transformer le descripteur qualitatif **famhist** en descripteur(s) quantitatifs
+
+3. standardiser les descripteurs
+
+
+```{r}
+# extract outcome #
+#-----------------#
+y = tab$chd
+# convert to a factor
+y = factor(y)
+
+# convert famhist to numeric #
+#----------------------------#
+#(NB: only two levels, so can use a single variable)
+tab$famhist = as.numeric(tab$famhist) - 1
+
+# extract matrix #
+#----------------#
+# discard outcome
+X = tab[,-which(colnames(tab)=="chd")]
+# convert to matrix
+X = as.matrix(X)
+# scale columns
+X = scale(X)
+```
+
+
+# Question 3 : construire un modèle lasso et représenter le chemin de régularisation obtenu
+
+On construit le modèle  avec la fonction $\texttt{glmnet}$ et on représente le chemin de régularisation obtenu avec la fonction $\texttt{plot.glmnet}$.
+
+Notons que par défaut la fonction $\texttt{glmnet}$ considère 100 valeurs du paramètre de régularisation définies automatiquement (se référer à la documentation pour davantage de précisions).
+
+```{r, fig.height = 5, fig.width = 5}
+# load package
+library(glmnet)
+# fit model
+fit.lasso = glmnet(x = X, y = y, family = 'binomial')
+# plot
+plot(fit.lasso)
+```
+
+
+# Question 4 : faire de même pour une pénalité "ridge".
+
+Il suffit pour cela de modifier le paramètre $\alpha$ qui définit la pénalité **elastic-net**: 
+$$ \Omega(w) = \alpha ||w||_1 + \frac{1-\alpha}{2} ||w||_2^2$$.
+
+Le paramètre $\alpha$ vaut par défaut zéro, ce qui correspond à un modèle lasso.
+Se référer à la documentation pour davantage de précision.
+
+```{r, fig.height = 5, fig.width = 5}
+# fit model
+fit.ridge = glmnet(x = X, y = y, family = 'binomial', alpha = 0)
+# plot
+plot(fit.ridge)
+```
+
