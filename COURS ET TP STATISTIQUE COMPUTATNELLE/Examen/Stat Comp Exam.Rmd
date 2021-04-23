@@ -1,0 +1,310 @@
+---
+title: "Stat Compt Exam"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "31 octobre 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+1 Exercice 1 - simulation par inversion
+
+
+
+```{r}
+f<-function(x,a,b){
+  y<-numeric()
+  for (i in 1:length(x)){
+    if(x[i]>=b){
+      y[i]=a*b^a/(x[i]^(a+1))
+    } else { 
+      y[i]=0
+    }
+  }
+  return(y)
+}
+
+x1=seq(0,10,0.5)
+plot(x1, f(x=x1,a=1,b=2))
+```
+
+1. Représenter cette densité pour b = 2 et a ={1,2,3}.
+
+
+```{r}
+b=2
+a=c(1,2,3)
+x=seq(2,10,0.1)
+
+
+#??par(mfrow=c(2,2))
+
+#for (i in 1:length(a)){
+
+plot(x,f(x,a[1],b),col="red", type = "l", lty = 2, lwd = 2, xlab = "x")
+   lines(x,f(x,a[2],b),col= "blue", type = "l", lty = 2, lwd = 2, xlab = "x")
+   lines(x,f(x,a[3],b), col="green", type = "l", lty = 2, lwd = 2, xlab = "x")
+  
+  #plot(x, f(x,a[i],b=2), type = "l", lty = 2, lwd = 2, xlab = "x")
+  
+#}
+```
+2. Implémenter une procédure d'inversion pour simuler une variable aléatoire selon cette densité. 
+
+
+```{r}
+n=50
+b=2
+a=c(1,2,3)
+x=runif(n,0,1)
+#x<-seq(0,10,0.5)
+a=1
+#F_1<-function(x,a,b){
+  y<-numeric()
+  for (i in 1:length(x)){
+  if(x[i]>=b){
+    y[i]=b/((1-x[i])^(1/a))}
+    else { y[i]=0
+    }
+  }
+  
+  
+ # return(y)
+#}
+
+#for (i in 1:length(a)) {
+  
+  # plot(density(F_1(x,a[1],b)),col="red")
+  #  lines(density(F_1(x,a[2],b)),col= "blue")
+  #  lines(density(F_1(x,a[3],b)), col="green")
+  
+  
+#}
+plot(y)
+
+## Question2
+inverse <- function(a,b,u) {
+  b/ ((1-u)**(1/a))
+}
+
+
+
+```
+
+3. Simuler un échantillon et comparer graphiquement la densité obtenue empiriquement à la densité théorique.
+Ici il s'agit de la loi Pareto. Nous simulons donc un échantillon selon la loi Pareto pour comparer sa densité empirique et à la densité théorique
+
+
+```{r}
+
+
+y <- runif(1000,0,1)
+x1 <- seq(0,10,0.01)
+
+hist(inverse(a=1,b=2,u=y), breaks = 10000,probability = TRUE,xlim = c(0,10))
+lines(x1,f(x1,a=1,b=2),col="red")
+
+#meme chose à faire pour les autres valeurs de a
+
+
+```
+
+
+EXERCICE3
+
+
+```{r}
+library(bootstrap)
+
+#install.packages("FactoMineR")
+
+library(FactoMineR)
+set.seed(27)
+
+#load ("C:Users/im2ag/Desktop/M2 SSD/COURS ET TP STATISTIQUE COMPUTATNELLE/Examen/spectra.Rdata")
+
+data<-load( "spectra.Rdata" )
+
+head(data)
+head(X)
+colnames(X)
+rownames(X)
+
+
+
+#1. Représenter (sur une meme figure) un échantillon aléatoire de 50 spectres 
+
+n=50
+
+z<-X[sample(1:nrow(X),n),]
+nrow(z)
+
+plot(z[1,])
+
+for (i in 2:nrow(z)){
+lines(z[i,],col=i)
+}
+```
+
+```{r}
+
+#2
+
+#pca<-prcomp(X[1:10,])
+#summary(pca)
+
+res.pca <- PCA(X,scale.unit=TRUE,ncp = 10, graph = TRUE)
+summary(res.pca)
+head(res.pca)
+
+library("factoextra")
+
+eig.val <- get_eigenvalue(res.pca)
+eig.val[1:10,2]
+
+#pca$sdev^2 / sum(res.pca$sdev^2)*100
+
+fviz_eig(res.pca, addlabels = TRUE, ylim = c(0, 60))
+
+#Représentation sous forme des spectres des deux axes principaux
+
+var <- get_pca_var(res.pca)
+axes_pr<-var$coord[,1:2]
+axes<-t(axes_pr)
+plot(axes[1,], col="red", type="b")
+lines(axes[2,], type="b")
+
+plot(eig.val[1:10,2])
+
+```
+
+
+
+
+
+
+
+3-  Bootstrap
+
+```{r}
+
+#creating one replication of the dataset
+
+one.replication <- function(dataset){
+n <- nrow(dataset)
+index <- sample.int(n,size=50,replace=T)
+out.dataset <- dataset[index,]
+return(out.dataset)
+}
+
+
+
+#performing a pca on a replication of the dataset
+
+pca.replication <- function(dataset){
+one.dataset <- one.replication(dataset)
+pca <- PCA(one.dataset,ncp = 10, graph = FALSE)
+#prct_var <- (pca$sd^2/sum(pca$sdev^2))*100
+prct_var <- as.vector(get_eigenvalue(pca)[1:10,2])
+return(prct_var)
+}
+
+
+#Fonction pour Bootstrap
+
+# B=200
+# prct<-list()
+# 
+# n <- nrow(X)
+# for(b in 1:B){
+# index <- sort(sample.int(n,replace=T))
+# out.dataset <- X[index,]
+# pca <- PCA(out.dataset,ncp = 10, graph = FALSE)
+# prct[[b]] <- as.vector(((pca$sd^2/sum(pca$sdev^2))*100)[1:10])
+# 
+# }
+# 
+# pca$var
+# hist(prct,breaks = 50)
+
+#bootstraping pca
+
+library(boot)
+
+T<-10 # remplacer T par 1000
+res.boot <- replicate(T,pca.replication(X))
+
+
+#Intervalle de confiance
+
+Iperc <- matrix(data = NA,nrow=10,ncol=2)
+q1 <- numeric()
+q2 <- numeric()
+for(i in 1:T){
+q1[i]=quantile(res.boot[i,],0.025)
+q2[i]=quantile(res.boot[i,],0.975)
+Iperc[i,]=c(q1[i],q2[i])
+}
+
+#Représentation graphique 
+
+plot(Iperc[,1])
+lines(Iperc[,2])
+lines(eig.val[1:10,2],col="red")
+
+
+```
+
+
+```{r}
+
+##4
+
+
+pca.replication2 <- function(dataset){
+one.dataset <- one.replication(dataset)
+pca <- PCA(one.dataset,ncp = 10, graph = FALSE)
+var <- get_pca_var(pca)
+axes_pr<-t(var$coord[,1:2])
+return(axes_pr)
+}
+
+
+T<-10 # remplacer T par 1000
+variabilite_dim.boot <- replicate(T,pca.replication2(X))
+
+dim1 <- variabilite_dim.boot[1,,]
+dim2 <- variabilite_dim.boot[2,,]
+
+#Intervalle de confiance
+
+Iperc1 <- matrix(data = NA,nrow=240,ncol=4)
+dim1_q1 <- numeric()
+dim1_q2 <- numeric()
+dim2_q1 <- numeric()
+dim2_q2 <- numeric()
+for(i in 1:nrow(dim1)){
+dim1_q1[i]=quantile(dim1[i,],0.025)
+dim1_q2[i]=quantile(dim1[i,],0.975)
+dim2_q1[i]=quantile(dim2[i,],0.025)
+dim2_q2[i]=quantile(dim2[i,],0.975)
+Iperc1[i,]=c(dim1_q1[i],dim1_q2[i],dim2_q1[i],dim2_q2[i])
+}
+
+#Représentation graphique 
+#dim1
+plot(Iperc1[,1])
+lines(Iperc1[,2])
+lines(axes[1,], col="red", type="b")
+
+
+#dim2
+plot(Iperc1[,3])
+lines(Iperc1[,4])
+lines(axes[2,], type="b",col="red")
+
+```
+

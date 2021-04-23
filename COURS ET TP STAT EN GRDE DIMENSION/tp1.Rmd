@@ -1,0 +1,596 @@
+
+---
+title: "TP STATISTIQUE EN GRANDE DIMENSION"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "7 janvier 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE,eval = TRUE)
+```
+
+
+
+#TP2
+
+
+#2 - Sélection de modèle
+
+
+##2-1 Les données
+
+Ces données proviennent d'une étude qui a examiné la corrélation entre le niveau d'antigène spécifique de la prostate et un certain nombre de mesures cliniques chez les hommes sur le point de subir une prostatectomie radicale.
+
+Téléchargement des données
+```{r}
+library(lasso2)
+
+data("Prostate")
+
+```
+
+
+Nous vérifions que les données correspondent bien au tableau de description et  
+faisons quelques statistiques descriptives : dim, names, summary, cor, hist
+```{r}
+summary(Prostate)
+Prostate$svi <- as.factor(Prostate$svi)
+Prostate$gleason <- as.factor(Prostate$gleason)
+
+```
+Les variables svi et gleason sont qualitatives.
+
+```{r}
+Prostate$svi=as.factor(Prostate$svi) 
+Prostate$gleason=as.factor(Prostate$gleason)
+
+dim(Prostate) 
+names(Prostate)
+summary(Prostate)
+cor(Prostate[,-c(5,7)])
+
+par(mfrow=c(2,2))
+hist(Prostate$lpsa)
+hist(Prostate$lcavol)
+
+hist(Prostate$lweight)
+hist(Prostate$age)
+
+#hist(Prostate$lbph)
+#hist(Prostate$svi)
+#hist(Prostate$lcp)
+#hist(Prostate$gleason)
+#hist(Prostate$pgg45)
+```
+Il s'agit d'une matrice de données comportant 97 lignes et 9 colonnes.
+On remarque aussi que la distribution des variables lpsa, lcavol, weight et âge semblent suivre une loi normale.
+
+
+##Données train et test
+Les valeurs de lpsa sont rangées par ordre croissant. 
+Nous divisons ici le jeu de données en un échantillon d'apprentissage pour estimer les modèles et en un échantillon de test pour comparer les erreurs de prédiction. On conserve 1/4 des données pour l'échantillon de test.
+
+```{r}
+ind.test=4*c(1:22)
+
+Prostate.app=Prostate[-ind.test,]
+
+Prostate.test=Prostate[c(ind.test),]
+
+```
+
+
+On donne quelques statistiques descriptives des données : Prostate.app et Prostate.test
+```{r}
+dim(Prostate.test)
+dim(Prostate.app)
+
+ntest=length(Prostate.test$lpsa)
+napp=length(Prostate.app$lpsa)
+
+summary(Prostate.app)
+summary(Prostate.test)
+```
+On obteint donc un jeu d'apprentissage comportant 75 lignes et 9 colonnes et un jeu de test de 22 lignes et 9 colonnes.
+
+
+##2.2 Modèle linéaire complet
+
+Une fonction utile de graphe des résidus
+```{r}
+plot.res=function(x,y,titre=""){
+  plot(x,y,col="blue",ylab="Résidus", xlab="Valeurs predites",main=titre) 
+  abline(h=0,col="green")
+}
+```
+
+
+##2.2.1 Estimation du modèle et graphes des résidus 
+
+```{r}
+modlin=lm(lpsa~., data=Prostate.app) 
+summary(modlin) 
+
+#Résidus
+
+res=residuals(modlin) 
+
+#Regroupement des graphiques sur la même page 
+
+par(mfrow=c(1,2)) 
+hist(residuals(modlin))
+qqnorm(res)
+qqline(res, col = 2)
+
+# retour au graphique standard 
+
+par(mfrow=c(1,1)) 
+plot.res(predict(modlin),res)
+```
+Les p-valeurs de certaines variables comme lcavol, lweight, age et svi1 sont rès significatives.
+Selon la répartition des points (uniformément répartis), on peut dire que les résidus sont sans biais. En regardant l'histogramme des résidus, nous pouvons dire que leur distribution suit une loi normale avec des quantiles compris entre -1.86 et +1.5.
+
+##2.2.2 Erreur d'apprentissage 
+
+Calculons l'erreur d'apprentissage 
+```{r}
+mean(res**2)
+```
+L'erreur d'apprentissage obtenue est de 0.46.
+
+##2.2.3 Erreur sur l'échantillon test
+
+```{r}
+pred.test=predict(modlin, newdata=Prostate.test)
+res.test=pred.test-Prostate.test$lpsa
+mean(res.test**2)
+```
+On obtient 0.45 comme valeur de l'erreur sur l'échantillon de test.
+
+Les erreurs d'apprentissage et de test sont donc presqu'égales.
+
+##2.2.4 Nouvelle paramétrisation
+
+Afin de faciliter l'interprétation des résultats concernant les variables qualitatives, on introduit une nouvelle paramétrisation à l'aide de contrastes. Par défaut, la référence est prise pour la valeur 0 de svi et 6 de gleason, qui sont les plus petites valeurs. Les paramètres indiqués pour les variables svi1 gleason 7, 8 et 9 indiquent l'écart estimé par rapport à cette référence. Il est plus intéressant en pratique de se référer à la moyenne des observations sur toutes les modalités des variables qualitatives, et d'interpréter les coefficients comme des écarts à cette moyenne.
+
+```{r}
+
+contrasts(Prostate.app$svi) <-
+  contr.sum(levels(Prostate.app$svi))
+contrasts(Prostate.app$gleason) <-
+  contr.sum(levels(Prostate.app$gleason))
+modlin2 <- lm(lpsa ~ ., Prostate.app)
+summary(modlin2)
+```
+Nom des variables : gleason1 =6, gleason2 =7, gleason3 =8, gleason4 =9 , la somme des coefficients associés à ces variables est nulle. svi1=0, svi2=1.
+La somme des deux coefficients est nulle.
+
+
+#3 Sélection de modèle par sélection de variables
+
+##3.1 Sélection par AIC et backward 
+
+```{r}
+library(MASS)
+modselect_b=stepAIC(modlin2,~.,trace=TRUE, direction=c("backward"))
+summary(modselect_b)
+```
+La sélection par crière AIC et backward nous fournit comme meilleur modèle celui en fonction des variables lcavol, lweight, age, lbph, svi. Ceci avec un AIC = 41.19.
+On note que certaines variables comme âge et lbph restent non significatifs.
+
+##3.2 Sélection par AIC et forward 
+
+```{r}
+mod0=lm(lpsa~1,data=Prostate.app)
+modselect_f=stepAIC(mod0,lpsa~lcavol+lweight
+                    +age+lbph+svi+lcp+gleason+pgg45,data= 
+                      Prostate.app,trace=TRUE,direction=c("forward"))
+summary(modselect_f)
+```
+Avec la sélection par AIC et forward, on obtient presque les mêmes résultats qu'avec la sélection par AIC backward. 
+
+##3.3 Sélection par AIC et stepwise
+
+```{r}
+modselect=stepAIC(modlin2,~.,trace=TRUE, direction=c("both")) 
+summary(modselect)
+```
+On retrouve ici le meme modèle qu'avec l'agorithme backward.
+
+##3.4 Sélection par BIC et stepwise
+
+k=log(napp) pour BIC au lieu de AIC.
+```{r}
+modselect_BIC=stepAIC(modlin2,~.,trace=TRUE, direction=c("both"),k=log(napp)) 
+
+summary(modselect_BIC)
+```
+Avec la méthode BIC et stepwise, on obtient moins de variables dans le meilleur sélectionné comparé aux méthodes précédentes. Le modèle sélectionné est plus parcimonieux dans le cas de la méthode BIC et stepwise.
+
+
+##3.5 Erreur sur l'échantillon d'apprentissage 
+
+Modèle stepwise AIC 
+```{r}
+mean((predict(modselect)-Prostate.app[,"lpsa"])**2)
+```
+Avec la méthode stepwise AIC, on trouve pour valeur 0.49 comme erreur sur l'échantillon d'apprentissage.
+
+Modèle stepwise BIC
+```{r}
+mean((predict(modselect_BIC)-Prostate.app[,"lpsa"])**2)
+```
+Avec la méthode stepwise BIC, on trouve pour valeur 0.53 comme erreur sur l'échantillon d'apprentissage.
+
+
+##3.6 Calcul de l'erreur sur l'échantillon test 
+
+Modèle stepwise AIC
+```{r}
+mean((predict(modselect,newdata=Prostate.test)-Prostate.test[,"lpsa"])**2) 
+```
+Avec la méthode stepwise AIC, on trouve pour valeur 0.46 comme erreur sur l'échantillon test.
+
+
+Modèle stepwise BIC
+```{r}
+mean((predict(modselect_BIC,newdata=Prostate.test)-Prostate.test[,"lpsa"])**2) 
+```
+Avec la méthode stepwise BIC, on trouve pour valeur 0.40 comme erreur sur l'échantillon test.
+
+
+Les modèles sélectionnés ont une erreur plus grande que le modèle linéaire comprenant toutes les variables sur l'échantillon d'apprentissage. Sur l'échantillon test, le modèle qui minimise le critère BIC a de meilleures performances que le modèle initial. Les deux modèles sélectionnés sont beaucoup plus parcimonieux que le modèle initial.
+
+
+#4-Sélection de modèle par pénalisation Ridge
+
+##4.1 Comportement des coefficients
+
+Calcul des coefficients pour différentes valeurs du paramètre lambda
+```{r}
+library(MASS) 
+library(lasso2)
+
+mod.ridge=lm.ridge(lpsa~.,data=Prostate.app, lambda=seq(0,20,0.1))
+
+par(mfrow=c(1,1))
+plot(mod.ridge)
+```
+
+
+Evolution des coefficients
+```{r}
+par(mfrow=c(1,2))
+matplot(t(mod.ridge$coef),lty=1:3,type="l",col=1:10) 
+legend("top",legend=rownames(mod.ridge$coef), col=1:10,lty=1:3)
+```
+
+
+##4.2 Pénalisation optimale par validation croisée
+
+```{r}
+select(mod.ridge) #noter la valeur puis estimer 
+mod.ridgeopt=lm.ridge(lpsa~.,data=Prostate.app, lambda=10.4)
+```
+
+
+##4.3 Prévision et erreur d'apprentissage
+
+Ici, on calcule les valeurs prédites à partir des coefficients.
+
+Coefficients du modèle sélectionné: 
+```{r}
+coeff=coef(mod.ridgeopt)
+```
+
+On crée des vecteurs pour :
+
+-les variables qualitatives
+```{r}
+svi0.app=1*c(Prostate.app$svi==0)
+svi1.app=1-svi0.app
+gl6.app=1*c(Prostate.app$gleason==6)
+gl7.app=1*c(Prostate.app$gleason==7)
+gl8.app=1*c(Prostate.app$gleason==8) 
+gl9.app=1*c(Prostate.app$gleason==9)
+```
+
+-les variables quantitatives
+```{r}
+lcavol.app=Prostate.app$lcavol
+lweight.app=Prostate.app$lweight 
+age.app=Prostate.app$age 
+lbph.app=Prostate.app$lbph 
+lcp.app=Prostate.app$lcp 
+pgg45.app=Prostate.app$pgg45
+```
+
+
+On calcule ici des valeurs prédites
+```{r}
+fit.rid=rep(coeff[1],napp)+coeff[2]*lcavol.app+ 
+  coeff[3]*lweight.app+coeff[4]*age.app+ 
+  coeff[5]*lbph.app+coeff[6]*svi0.app-
+  coeff[6]*svi1.app+coeff[7]*lcp.app+ 
+  coeff[8]*gl6.app+coeff[9]*gl7.app+ 
+  coeff[10]*gl8.app-(coeff[8]+coeff[9]+ 
+  coeff[10])*gl9.app+coeff[11]*pgg45.app
+
+```
+
+
+Nous traçons ensuite des valeurs prédites en fonction des valeurs observées
+```{r}
+par(mfrow=c(1,1))
+plot(Prostate.app$lpsa,fit.rid) 
+abline(0,1) 
+```
+
+On calcule et on fait le tracé des résidus 
+```{r}
+res.rid=fit.rid-Prostate.app[,"lpsa"]
+plot.res(fit.rid,res.rid,titre="Tracé des résidus") 
+
+```
+Selon la répartition des points (uniformément répartis), on peut dire que les résidus sont sans biais.
+
+Erreurd'apprentissage
+```{r}
+
+mean(res.rid**2) 
+```
+On trouve pour valeur 0.478 comme erreur d'apprentissage.
+
+
+##4.4 Prévision sur l'échantillon test
+
+Les variables qualitatives
+```{r}
+svi0.t=1*c(Prostate.test$svi==0)
+svi1.t=1-svi0.t 
+gl6.t=1*c(Prostate.test$gleason==6) 
+gl7.t=1*c(Prostate.test$gleason==7) 
+gl8.t=1*c(Prostate.test$gleason==8) 
+gl9.t=1*c(Prostate.test$gleason==9) 
+```
+
+
+Les variables quantitatives
+```{r}
+lcavol.t=Prostate.test$lcavol 
+lweight.t=Prostate.test$lweight 
+age.t=Prostate.test$age 
+lbph.t=Prostate.test$lbph 
+lcp.t=Prostate.test$lcp 
+pgg45.t=Prostate.test$pgg45
+
+prediction=rep(coeff[1],ntest)+coeff[2]* 
+  lcavol.t+coeff[3]*lweight.t+coeff[4]*age.t+
+  coeff[5]*lbph.t+coeff[6]*svi0.t-coeff[6]*svi1.t+
+  coeff[7]*lcp.t+coeff[8]*gl6.t+coeff[9]*gl7.t+ 
+  coeff[10]*gl8.t-(coeff[8]+coeff[9]+coeff[10])* 
+  gl9.t+coeff[11]*pgg45.t
+```
+
+
+Erreur sur l'échantillon test
+```{r}
+mean((Prostate.test[,"lpsa"]-prediction)^2)
+```
+On trouve pour valeur 0.424 comme erreur sur l'échantillon test.
+
+L'erreur d'apprentissage est légèrement plus élevée que pour le modèle linéaire sans pénalisation. L'erreur de test est plus faible.Les performances sont comparables sur l'échantillon test au modèle sélectionné par le critère BIC.En terme d'interprétation,les modèles sélectionnés par AIC et BIC sont préférables.
+
+#5 Sélection de modèle par pénalisation Lasso
+
+##5.1 Librairie Lasso2
+
+```{r}
+library(lasso2)
+```
+
+##5.2 Construction du modèle
+
+```{r}
+l1c.P<-l1ce(lpsa~.,Prostate.app, 
+            bound=(1:100)/100,absolute.t=FALSE)
+
+```
+La borne est ici relative,elle correspond à une certaine proportion de la norme L1 du vecteur des coeficients des moindres carrés.Une borne égale à 1 correspond donc à l'absence de pénalité,on retrouve l'estimateur des moindres carrés.
+
+##5.3 Visualisation des coefficients
+
+On visualise ici les coefficients du modèle
+```{r}
+
+coefficients=coef(l1c.P)
+plot(l1c.P,col=1:11,lty=1:3,type="l",main="Coefficients avec le terme constant")
+legend("topleft",legend=colnames(coefficients),
+       col=1:11,lty=1:3)
+
+#On supprime le terme constant
+penalite_relative=c(1:100)/100
+matplot(penalite_relative,coefficients[,-1],
+        lty=1:3,type="l",col=1:10, main="Coefficients après suppression du terme constant")
+legend("topleft",legend=
+         colnames(coefficients[,-1]),col=1:10,lty=1:3)
+```
+En fonction de différentes valeurs de la pénalité, on obtient différentes valeurs pour les coefficients. Afin de faire un bon choix de la pénalité, nous procédons par la méthode de validation croisée.
+
+##5.4 Sélection de la pénalité par validation croisée
+
+On procède à la validation croisée pour sélectionner la pénalité.
+```{r}
+vc=gcv(l1c.P)
+crit.vc=vc[,"gcv"]
+bound_opt=vc[which.min(crit.vc),"rel.bound"]
+
+l1c.opt <- l1ce(lpsa ~ ., Prostate.app,
+                bound=bound_opt, absolute.t=FALSE)
+coef=coef(l1c.opt)
+
+```
+Par la méthode de validation croisée, on obtient 0.95 comme valeur de la meilleure pénalité qui nous a servi à optimiser notre modèle précédent en utilisant que cette meilleure pénalité dans le modèle.
+
+##5.5 Erreur d'apprentissage
+
+```{r}
+
+fit=fitted(l1c.opt)
+mean((fit-Prostate.app[,"lpsa"])^2)
+```
+On trouve pour valeur 0.46 comme erreur d'apprentissage.
+
+##5.6 Erreur sur l'échantillon test
+
+```{r}
+prediction=predict(l1c.opt,newdata=Prostate.test)
+mean((prediction-Prostate.test[,"lpsa"])^2)
+```
+On trouve pour valeur 0.44 comme erreur sur l'échantillon test.
+
+##5.7 Librairie glmnet
+
+L'utilisation de la librairie glmnet fournit des résultats plus rapides, ce qui peut s'avérer important pour des données de grande dimension. Par contre, on ne peut pas traiter à priori des variables qualitatives. Nous allons donc devoir créer des vecteurs avec des variables indicatrices des diverses modalités pour les variables qualitatives. Nous ne prendrons pas en compte les contrastes.
+
+##5.8 Mise en forme des variables
+
+on construit une matrice xx.app d'apprentissage et xx.test de test
+```{r}
+data(Prostate)
+Prostate.app=Prostate[-ind.test,]
+Prostate.test=Prostate[c(ind.test),]
+
+x.app=Prostate.app[,-9]
+y.app=Prostate.app[,9]
+x.app=as.matrix(x.app)
+```
+
+On construit ici des vecteurs indicatrices pour les variables qualitatives
+```{r}
+svi1.app=1*c(Prostate.app$svi==1)
+gl7.app=1*c(Prostate.app$gleason==7)
+gl8.app=1*c(Prostate.app$gleason==8)
+gl9.app=1*c(Prostate.app$gleason==9)
+```
+
+
+On crée une matrice avec les vecteurs indicatrices
+```{r}
+xx.app=matrix(0,ncol=10,nrow=nrow(x.app))
+xx.app[,1:6]=x.app[,1:6]
+xx.app[,7:9]=cbind(gl7.app,gl8.app,gl9.app)
+xx.app[,10]=x.app[,8]
+```
+
+On nomme les colonnes avec les noms des variables
+```{r}
+colnames(xx.app)=c("lcavol","lweight", "age",
+                   "lbph","svi1","lcp","gl7","gl8","gl9","pgg45")
+
+```
+
+On fait de même pour l'echantillon test
+```{r}
+x.test=Prostate.test[,-9]
+y.test=Prostate.test[,9]
+x.test=as.matrix(x.test)
+svi1.test=1*c(Prostate.test$svi==1)
+gl7.test=1*c(Prostate.test$gleason==7)
+gl8.test=1*c(Prostate.test$gleason==8)
+gl9.test=1*c(Prostate.test$gleason==9)
+```
+
+On construit une matrice avec les vecteurs indicatrices
+```{r}
+xx.test=matrix(0,ncol=10,nrow=nrow(x.test))
+xx.test[,1:6]=x.test[,1:6]
+xx.test[,7:9]=cbind(gl7.test,gl8.test,gl9.test)
+xx.test[,10]=x.test[,8]
+colnames(xx.test)=colnames(xx.app)
+```
+
+
+##5.9 Construction du modèle
+
+```{r}
+library(glmnet)
+out.lasso = glmnet(xx.app,y.app)
+l=length(out.lasso$lambda)
+b=coef(out.lasso)[-1,1:l]
+```
+
+
+##5.10 Visualisation des coefficients
+
+Chemin de régularisation du lasso
+```{r}
+par(mfrow=c(1,2))
+matplot(t(as.matrix(out.lasso$beta)),type="l",
+        col=1:10,lty=1:3)
+legend("topleft",legend=colnames(xx.app),
+       col=1:10,lty=1:3)
+title("Lasso")
+```
+Ici, on a tracé les coefficients des différentes variables du modèle Lasso.
+
+##5.11 Sélection de la pénalité par validation croisée
+
+Nous appliquons la méthode de validation croisée afin de sélectionner la meilleure pénalité.Ensuite, on optimise le modèle avec la valeur de la meilleure pénalité trouvée par la méthode de validation croisée.
+```{r}
+y.app=as.matrix(y.app)
+a=cv.glmnet(xx.app,y.app)
+
+#le resultat est dans
+lambda.opt=a$lambda.min
+app=glmnet(xx.app,y.app,lambda=lambda.opt)
+```
+Nous trouvons la valeur de 0.0444 comme meilleure pénalité.
+
+##5.12 Erreur d'apprentissage
+
+```{r}
+appr=predict(app,newx=xx.app)
+mean((appr-Prostate.app[,9])^2)
+```
+Avec le modèle optimisé, nous trouvons 0.48 comme valeur de l'erreur d'apprentissage.
+
+##5.13 Erreur sur l'échantillon test
+
+```{r}
+pred=predict(app,newx=xx.test)
+mean((pred-Prostate.test[,9])^2)
+```
+Avec le modèle optimisé, nous trouvons environ 0.39 comme erreur de prédiction commise sur le jeu de test.
+
+Il est à noter que l'erreur de test est un peu plus petite que l'erreur d'apprentissage.
+
+##5.14 Elastic Net
+
+La méthode Elastic Net est une méthode qui permet de résoudre les problèmes liés à la méthode Lasso (comme par exemples le problème de colinéarité entre les variables et le problème du nombre de variables à sélectionner lié au fléau de la dimension).
+
+On peut jouer avec le paramètre alpha de glmnet
+```{r}
+out.elnet <- glmnet(xx.app,y.app,alpha=0.5)
+a.elnet=cv.glmnet(xx.app,y.app,alpha=0.5)
+lambda.opt=a.elnet$lambda.min
+app=glmnet(xx.app,y.app,lambda=lambda.opt)
+```
+Ici, nous avons crée un modèle avec 0.5 comme paramètre alpha. On a procédé ensuite par la méthode de validation croisée pour choisir le meilleur paramètre lambda. Ceci nous a permis d'optimiser notre modèle. On utilise donc le modèle optmisé pour faire des prédictions et calculer les erreurs commises sur le jeu d'apprentissage et sur le jeu de test.
+
+Erreur d'apprentissage
+```{r}
+app.elnet=predict(a.elnet,newx=xx.app)
+mean((app.elnet-Prostate.app[,9])^2)
+```
+Nous trouvons la valeur 0.6 comme erreur d'apprentissage.
+
+Erreur de prédiction
+```{r}
+predi.elnet=predict(a.elnet,newx=xx.test)
+mean((predi.elnet-Prostate.test[,9])^2)
+```
+Nous trouvons la valeur 0.37 comme erreur de test.
+
+L'erreur commise sur le jeu de test est plus petite que celle commise sur le jeu d'apprentissage.
