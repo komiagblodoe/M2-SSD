@@ -1,0 +1,36 @@
+{
+    "tests" : [
+        {
+            "testKey" : "ENV-12",
+            "status" : "PASSED",
+            "steps": [
+                {
+                    "status": "PASSED",
+                    "comment": ""
+                },
+                {
+                    "status": "PASSED",
+                    "comment": "Variable RENAL OK"
+
+                },
+
+                {
+                    "status": "PASSED",
+                    "comment": " "
+
+                },
+
+                {
+                    "status": "PASSED",
+                    "comment": " "
+
+                },
+                {
+                    "status": "PASSED",
+                    "comment": " "
+
+                }
+            ]
+        }
+    ]
+}

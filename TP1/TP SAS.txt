@@ -1,0 +1,46 @@
+﻿proc import datafile='/home/thomasvrignaud0/myel_comp.txt' out=myel  replace ;
+	delimiter=" "; guessingrows=30;
+run;
+
+
+ proc freq data=myel ;
+ table Age Sexe calcium Bence_J;
+ run;
+ 
+ 
+/*calcul du poids total*/
+proc univariate data=myel;
+var Bence_J;
+output out=rt sum=;
+run;
+
+proc sort data=myel ; by Bence_J;run;
+proc gplot data=myel ;         
+   plot Age*sexe ;   
+by Bence_J; 
+run; 
+
+proc sort data=myel ; by age;run;
+proc sort data=myel ; by sexe;run;
+proc boxplot data=myel ;
+plot age*sexe;
+run;
+ 
+ 
+/*Analyse de survie*/ 
+proc lifetest data=myel plots=(s) outsurv=estimates;
+time temps*deces(0);
+run;
+
+/*Question b) différence de protéine*/
+proc lifetest data=myel plots=(s);
+time temps*deces(0);
+strata calcium;
+run;
+
+proc lifetest data=myel plots=(s);
+time temps*deces(0);
+test bence_j;
+run;
+
+/*Avec ou sans bence_j*/

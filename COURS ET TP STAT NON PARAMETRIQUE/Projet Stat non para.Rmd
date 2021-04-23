@@ -1,0 +1,317 @@
+---
+title: "PROJET STATISTIQUE NON PARAMETRIQUE"
+author: "AGBLODOE Komi/VRIGNAUD Thomas  M2 SSD"
+date: "9 décembre 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+1  Représenter sur un même graphique le nuage des points $(\frac{i}{n},Y_i)_{1<=i<=n}$,
+la fonction g et l'estimateur $\hat g$ pour un choix de $K$, de $\alpha$ et de $\sigma^2$ que vous préciserez
+
+
+Sous R, l'estimateur de Nadaraya-Watson (qui est un estimateur par polynôme locaux de degré zéro) peut s'implémenter à partir de la fonction locpoly de la librairie KernSmooth. 
+
+Cet estimateur est de la forme : $$\hat g^{NW} (x)=\frac{\sum_{i=1}^n Y_i K(\frac{x-X_i}{h})}{\sum_{i=1}^nK(\frac{x-X_i}{h})}$$
+
+Pour trouver l'estimateur $\hat g$, on doit donc multiplier $\hat g^{NW} (x)$ par l'estimateur de la densité dont la formule est la suivante: 
+$$\hat g^{d} (x)=\frac{1}{n h}{\sum_{i=1}^n  K(\frac{x-X_i}{h})}$$. 
+Elle est obtenue par la fonction density sous R.
+
+ici on prend le noyau gaussien comme K, $\alpha=0$, $\sigma^2=1$
+
+
+```{r}
+require(KernSmooth)
+
+```
+
+
+
+```{r}
+set.seed(10000)
+
+# fonction g
+g<- function(x){sin(2*pi*x)}
+
+#initialisation de n
+
+n<-100
+
+#Création des vecteurs x et epsilon 
+x<-1:n/n;eps<-rnorm(n,0,1)
+
+#graphiqe du nuage de ppoints 
+Y<-g(x)+eps
+plot(x,Y,type="p",ylim=c(-3,3),ylab="Y",col="blue", main="Nuage de points") 
+
+#Ajoût de la courbe de g sur le même graphique
+curve(g(x),add=TRUE)
+
+#Estimation par polynômes locaux de g et tracée de la courbe 
+
+nw<-locpoly(x,Y,degree = 0,gridsize = n,bandwidth=0.04)$y*density(x,bw=0.04,kernel="gaussian",n=n)$y 
+
+lines(x,nw, type="l", col="red") 
+legend("topright", c("g(x)","g_hat"), col = c("black", "red"),lty=1)
+
+
+```
+
+
+2. Visualisez, selon des di???érentes valeurs de h, la situation de sous et de sur-lissage
+
+```{r}
+
+par(mfrow=c(1,2))
+
+#Vecteur des fenêtres
+
+h=c(0.004, 0.2)
+p=c("Sous-lissage","Sur-lissage")
+
+
+for (i in 1:2){
+  nw<-locpoly(x,Y,degree = 0, gridsize = n, bandwidth=h[i])$y*density(x,bw=h[i],kernel="gaussian",n=n)$y 
+plot(x,nw, type="l",lty=1,lwd=1, col="red",ylim=c(-1,1), main=paste("h = ",h[i],p[i]))
+curve(g(x),add=TRUE)
+legend("topright", c("g","g_hat"), col = c("black", "red"),lty=1)
+}
+
+```
+
+ Avec les graphes ci-dessus, on remarque que pour une valeur faible de la fenêtre, il y a un phénomène de sous-lissage (biais petit, variance grande) et quand la fenêtre est beaucoup plus grande, il ya un phénomène de sur-lissage (biais grand, variance petite). Il faut donc faire un compromis entre le biais et la variance pour trouver un meilleur choix de la fenêtre.
+ 
+ 
+3 Ecrire un programme qui calcule la valeur optimale du paramètre de lissage en fonction du ASE (Average square error)  qui est définit par:
+
+$ASE(h)=\frac{1}{n}{\sum_{i=1}^n (\hat r(x_i) - r(x_i))$
+Soit $\hat h_0$ cette valeur optimale du $ASE(h)$: $\hat h_0=argmin_{h>0} ASE(h)$
+
+
+
+Pour ce faire, nous allons écrire une fonction qui retourne un vecteur contenant la valeur optimale du paramètre de lissage ($\hat h_0$) et ASE($\hat h_0$). Nous allons ensuite prendre pour la fenêtre, une séquence entre 0.004 et 0.2 avec un pas de 0.001 pour choisir parmi cette séquence, la fenêtre qui minimise l'ASE. 
+
+```{r}
+
+#Fonction qui calcule ASE 
+
+ase<-function(g_hat,g){ 
+  mean((g_hat-g)^2) 
+}
+
+#Fonction qui détermine la valeur optimale h0_hat et ASE(h0_hat) 
+
+optimale_ASE <- function(x,Y,h,n){ 
+  vect=c() 
+  for(i in h){
+  nw=locpoly(x,Y,degree = 0,gridsize = n, bandwidth =     i)$y*density(x,bw=i,kernel="gaussian",n=n)$y 
+  vect=c(vect,ase(nw,g(x)))
+ } 
+return(cbind(h,vect)[which.min(vect),])
+  
+}
+
+#valeurs du paramètre de lissage
+
+h<-seq(0.004,0.2,by=1/1000)
+
+#Rentrée des paramètres dans la fonction pour 
+#obtenir le vecteur optimal h_0 et ASE(h_0)
+
+opt<-optimale_ASE(x,Y,h,n=100)
+
+cat("La valeur optimale du paramètre de lissage en fonction de l'ASE est: h0_hat = ",opt[1], "\n")
+
+cat("L'ASE correspondante est: ASE(h0_hat) =",opt[2])
+
+```
+
+
+4 Même question, en remplacant ASE(h) pour le critère de validation croisée CV(h) 
+
+Comme on a choisi le noyau gaussien au début,on a: K(0)=1/???2?? 
+
+```{r}
+#Fonction  pour le critère de validation croisée CV(h)
+
+cvh<-function(g_hat,y,n,h){ 
+  mean(((g_hat-y)/(1-(1/(sqrt(2*pi)*n*h))))^2) 
+}
+
+#Fonction qui détermine la valeur optimale h_hat et CV(h_hat) 
+
+optimale_CV<-function(x,Y,h,n){ 
+  vect1=c()
+  for(i in h){
+    nw=locpoly(x,Y,degree = 0, gridsize = n, bandwidth = i)$y*density(x,bw=i,kernel="gaussian",n=n)$y
+  vect1=c(vect1,cvh(nw,Y,n,i))
+ }
+
+ return(cbind(h,vect1)[which.min(vect1),]) # Récupération de la valeur optimale
+}
+
+n=100
+h=seq(0.004,0.2,by=1/1000) 
+opt2=optimale_CV(x,Y,h,n)
+
+cat("La valeur optimale du paramètre de lissage en fonction du CV(h) est h_hat = ",opt2[1], "\n")
+
+cat("Avec cette valeur optimale, on a: CV(h_hat) =",opt2[2])
+
+
+```
+
+5 Illustrer le comportement asymptotique lorsque n tend vers l'in???ni de:
+$$\frac{ASE(\hat h)}{ASE(\hat h_0)}$$
+
+```{r}
+
+#Séquence des vecteurs n et h
+n<-seq(100,2000,by=50) 
+h<-seq(0.004,0.2,by=1/1000)
+
+#création des vecteurs qui vont contenir respectivement les 
+#valeurs de h_0, h_chapeau, ASE(h_0) et ASE(h_chapeau) 
+tab_h0<- c()
+tab_hchap<- c() 
+tab_ase_h0 <- c() 
+tab_ase_h_chap <-c()
+
+
+for(i in n){
+  
+ set.seed(10000)
+  
+#Création des vecteurs x et epsilon
+  x<-1:i/i
+  eps<-rnorm(i,0,1) 
+  
+  #Vecteur Y 
+  Y<-g(x)+eps
+  
+#Calcul du vecteur optimal (h_0, ASE(h_0) ) 
+  
+  tab_h0<- c(tab_h0, optimale_ASE(x,Y,h,i)[1])
+  tab_ase_h0<- c(tab_ase_h0, optimale_ASE(x,Y,h,i)[2])
+  h_chap<- optimale_CV(x,Y,h,i)[1]
+  tab_hchap<- c(tab_hchap, h_chap)
+
+#Calul du ASE avec h_chapeau 
+  nw=locpoly(x,Y,degree = 0,gridsize = i, bandwidth =   h_chap)$y   *density(x,bw=h_chap,kernel="gaussian",n= i)$y
+                                                                           tab_ase_h_chap=c(tab_ase_h_chap,ase(nw,g(x)))
+  
+} 
+
+
+##Tracée de la courbe de ASE(h_chap)/ASE(h0)
+
+plot(n,tab_ase_h_chap/tab_ase_h0, type="b", ylab="ASE(h_chapeau)/ASE(h0)") 
+abline(h=1, col="red")
+```
+On remarque que quand n croît (tend vers l'in???ni), ASE($\hat h$)/ASE($\hat h_0$) tend vers 1. C'est à dire, avec un nombre croissant d'observations ASE($\hat h$)  est très proche de ASE($\hat h_0$). On peut dire que $\hat h$ est une bonne estimation de la fenêtre quand n est grand.
+
+6 Illustrer le comportement asymptotique lorsque n tend vers l'in???ni de $\frac{\hat h}{\hat h_0}$. Conclure
+
+```{r}
+
+plot(n,tab_hchap/tab_h0, type="b", ylab="h_chapeau/h0") 
+abline(h=1, col="red")
+
+```
+Quand n augmente (tend vers l'infini), $\frac{\hat h}{\hat h_0}$ tend vers 1. On peut donc dire que $\hat h_0$ approxime $\hat h$ lorsque n tend vers l'infini.
+
+
+
+7. Véri???er, par simulations, que n^3/10(^ h???^ h0) a un comportement gaussien
+
+Nous ???xons n à 1000. A chaque itération, nous calculons la valeur de $\hat h$ et $\hat h_0$ . On ensuite 50 itérations. Après on simule et on trace avec la fonction dnorm des variables aléatoires suivant la loi normale en prenant pour moyenne celle de l'échantillon et écart type celui de l'échantillon. 
+
+```{r}
+
+set.seed(11000)
+#Séquence des vecteurs n et h 
+
+n<-1000
+h<-seq(0.004,0.2,by=1/1000)
+
+#création des vecteurs qui vont contenir respectivement à nouveau les
+#valeurs de h_0, h_chapeau, ASE(h_0) et ASE(h_chapeau) 
+
+tab_h0<- c() 
+tab_hchap<- c() 
+tab_ase_h0 <- c() 
+tab_ase_h_chap <-c() 
+x<-1:n/n #vecteur x
+
+for(i in 1:50){
+
+#Création du vecteur epsilon 
+  eps<-rnorm(n,0,1) 
+  #Vecteur Y
+  Y<-g(x)+eps
+  
+  #Détermination du vecteur optimal (h_0, ASE(h_0) )
+  
+  tab_h0<- c(tab_h0, optimale_ASE(x,Y,h,n)[1]) 
+  tab_ase_h0<- c(tab_ase_h0, optimale_ASE(x,Y,h,n)[2]) 
+  h_chap<- optimale_CV(x,Y,h,n)[1] 
+  tab_hchap<- c(tab_hchap, h_chap)
+
+#Calul du ASE avec h_chapeau 
+  nw=locpoly(x,Y,degree = 0,gridsize = n, bandwidth = h_chap)$y*density(x,bw=h_chap,kernel="gaussian",n= n)$y
+                                                                          tab_ase_h_chap=c(tab_ase_h_chap,ase(nw,g(x)))
+}
+
+```
+
+Tracé de l'histogramme de n(3/10)(^ h???^ h0) 
+
+```{r}
+n=1000 
+ech= n^(3/10)*(tab_hchap - tab_h0) 
+hist(ech, col = "green", prob=TRUE) 
+curve(dnorm(x, mean=mean(ech), sd=sd(ech)), col=2,add=TRUE)
+
+```
+
+L'histogramme a bien l'allure d'une loi normale mais pour s'en convaincre nous faisons un test de shapiro
+
+```{r}
+shapiro.test(ech)
+```
+
+Au regard de la p-valeur obtenue(supérieure à 0.05), on accepte l'hypothèse de normalité de l'échantillon ech.
+
+
+8  Que peut être la loi asymptotique de $n(ASE(\hat h) - ASE(\hat h_0))$
+
+```{r}
+
+ech2=n*(tab_ase_h_chap - tab_ase_h0 )
+
+hist(ech2,col = "green", prob=TRUE, breaks = seq(0,15,0.25))
+
+x<-1:n/n
+curve(dchisq(x,df=mean(ech2)),add = TRUE)
+curve(dgamma(x,mean(ech2)/var(ech2),mean(ech2)/var(ech2)),col= "red", add = TRUE)
+summary(ech2)
+
+```
+
+Cet histogramme à l'allure d'une loi qui2 ou d'une loi gamma.
+
+```{r}
+ks.test(x=ech2,y=rchisq(1000,df=mean(ech2)))
+
+ks.test(x=ech2,y=rgamma(1000,shape=mean(ech2)/var(ech2),rate = mean(ech2)/var(ech2)))
+```
+
+
+9 Conclure quant au critère CV(h)
+
+En théorie, la fonction de régression r(x), est inconnue. C'est donc impossible de minimiser ASE, car il est aussi inconnu puisqu'il dépend de la fonction de régression. Dans notre TP, on constate qu'avec un nombre croissant d'observations, $\hat h$ est très proche de $\hat h_0$, et (ASE($\hat h$) aussi très proche de ASE($\hat h_0$). Ainsi, choisir la fenêtre qui minimise le critère CV(h) est donc une très bonne règle de sélection de la fenêtre dans l'estimation de la régression par noyau.

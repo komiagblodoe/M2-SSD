@@ -1,0 +1,33 @@
+---
+title: "Untitled"
+author: "AGBLODOE Komi /  M2 SSD"
+date: "20 janvier 2020"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#importation des jeu de données
+
+X_train = read.csv2("C:/Users/im2ag/Desktop/DATA-CHALLENGE/spectra-train.csv", header=FALSE)
+X_test = read.csv2("C:/Users/im2ag/Desktop/DATA-CHALLENGE/spectra-test.csv", header=FALSE)
+Y_train = read.csv2("C:/Users/im2ag/Desktop/DATA-CHALLENGE/meta-train.csv", header=FALSE)
+Y_test = read.csv2("C:/Users/im2ag/Desktop/DATA-CHALLENGE/meta-test.csv", header=FALSE)
+
+```
+
+```{r}
+
+
+
+
+
+library(FactoMiner)
+
+resp.pca<-pca(X_train,graph=FALSE)
+
+```
+

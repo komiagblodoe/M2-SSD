@@ -1,0 +1,231 @@
+---
+title: "TP3 -Fiabilité"
+author:
+date: "18/10/2019"
+output: html_document
+---
+
+
+Coder les 4 fonctions. 
+
+Premier cas Données complètes
+
+Weibull
+```{r}
+##données completes
+mle.exp.complet <- function(data,interval_beta = c(0,5)) {
+  
+  #calcul du beta
+  estbeta <- uniroot(function(beta) (1/beta) + mean(log(data)) - (sum(data^beta*log(data))/sum(data^beta)),lower = interval_beta[1], upper = interval_beta[2]  )$root
+  
+  #calcul du eta
+  esteta <-   (mean(data^estbeta))^(1/estbeta) 
+  
+ return( c(estbeta,esteta))
+}
+
+#simulation et appel de la fonction
+n <- 15
+beta <- c()
+eta <- c()
+for (i in 1:10000){
+#loi weibull
+data  <- rweibull(n,shape= 3, scale = 1000)
+beta[i] <- mle.exp.complet(data,interval_beta = c(0.01,50))[1]
+eta[i] <- mle.exp.complet(data,interval_beta = c(0.01,50))[2]
+}
+
+#beta
+hist(beta, breaks = seq(1,10,0.5))
+abline(v = 3, col="red")
+#eta
+hist(eta)
+abline(v = 1000, col="red")
+```
+
+Exponentiel
+```{r}
+##données complètes
+mle.exp.complet <- function(data) {
+  lambdaest <- 1/mean(data)
+  
+ return(lambdaest)
+}
+
+#simulation et appel de la 
+lambda <- c()
+for (i in 1:10000) {
+data <- rexp(25,2)
+lambda[i] <- mle.exp.complet(data)
+}
+#lambda
+hist(lambda, breaks = seq(0,7,0.2))
+abline(v = 2, col="red")
+
+```
+
+
+
+Deuxième cas Données censurées
+
+Weibull
+```{r}
+##données censure
+mle.exp.censure <- function(data,delta,interval_beta = c(0,5)) {
+  
+  xi <- sapply(1:length(data), function(x) min(data[x],delta))
+  censure_i <- (delta >= data)
+  
+  #calcul du beta
+  estbeta <- uniroot(function(beta) (1/beta) + sum(censure_i*log(xi))/sum(censure_i)    - (sum(log(xi)*(xi^beta))/sum(xi^beta)),lower = interval_beta[1], upper = interval_beta[2] )$root
+  
+  #calcul du eta
+  esteta <-   (sum(xi^estbeta) / sum(censure_i))^(1/estbeta) 
+  
+ return( c(estbeta,esteta))
+}
+
+
+n <- 15
+beta <- numeric()
+eta <- numeric()
+for (i in 1:10000){
+data <- rweibull(n,shape= 3, scale = 1000)
+beta[i] <- mle.exp.censure(data,delta = 1000, interval_beta = c(0.001,50))[1]
+eta[i] <- mle.exp.censure(data,delta = 1000, interval_beta = c(0.001,50))[2]
+}  
+  
+#beta
+hist(beta)
+abline(v = 3, col="red")
+#eta
+hist(eta)
+abline(v = 1000, col="red")
+  
+```
+
+
+Exponentiel
+
+```{r}
+##données completes
+mle.exp.censure <- function(data,delta) {
+  xi <- sapply(1:length(data), function(x) min(data[x],delta))
+  censure_i <- (delta >= data)
+  lambdaest <- sum(censure_i)/sum(xi)
+  
+ return(lambdaest)
+}
+
+#simulation et appel de la 
+n <- 25
+
+lambda <- c()
+for (i in 1:10000) {
+data <- rexp(n,2)
+lambda[i] <- mle.exp.censure(data,delta <- 0.8)
+}
+#lambda
+hist(lambda, breaks = seq(0,7,0.2))
+abline(v = 2, col="red")
+```
+
+Weibull avec Optim sans censure
+```{r}
+##données completes
+optim.weibull.complet <- function(data ,beta_init, eta_init) {
+  f_beta<-function(v){
+   beta <- v[1]
+   eta <-  v[2]
+   n*log(beta)- n*log(eta) + (beta-1)*sum(log(data/eta)) - sum((data/eta)**beta)
+   }
+para_init <- c(beta_init,eta_init)
+ estimation <- optim(par=para_init,fn=f_beta,method ="BFGS",control  = list(fnscale=-1)) #maximiser et on veut minimser
+ return(list(estimation$par,estimation$convergence))
+}
+
+n <- 1000
+data  <- rweibull(n,shape= 3, scale = 1000)
+optim.weibull.complet(data,2,500)
+
+```
+
+
+```{r}
+##données completes
+optim.weibull.complet <- function(data,delta,beta_init, eta_init) {
+  
+  xi <- sapply(1:length(data), function(x) min(data[x],delta))
+  censure_i <- (delta >= data)
+  
+  f_beta<-function(v){
+   beta <- v[1]
+   eta <-  v[2]
+   sum(censure_i)*log(beta)- sum(censure_i)*log(eta) + (beta-1)*sum(censure_i*log(xi/eta)) - sum((xi/eta)**beta)
+   }
+para_init <- c(beta_init,eta_init)
+ estimation <- optim(par=para_init,fn=f_beta,method ="BFGS",control  = list(fnscale=-1)) #maximiser et on veut minimser
+ return(list(estimation$par,estimation$convergence))
+}
+
+n <- 1000
+data  <- rweibull(n,shape= 3, scale = 1000)
+optim.weibull.complet(data,delta = 1000,beta_init = 2,eta_init = 500)
+
+```
+
+
+```{r}
+#simulation des echantillons
+n <- 20 
+data <- rexp(20,0.001)
+
+#moyenne et variance empirique
+mean(data)
+var(data)
+
+#fonction de repartition empirique
+plot(ecdf(data))
+
+#nuage de points
+y <- log(1 - seq(1,n-1,1)/n)
+plot(sort(data[-20]),y) #penser à trier les données
+
+#droite affine
+curve( -0.01410 -0.00096*x,add=TRUE, col="red")
+
+#droite linéaire
+curve(0-0.00096*x,add=TRUE, col="green")
+
+#regression
+lm(y~sort(data[-20]))
+
+
+##données completes
+mle.exp.complet <- function(data) {
+  lambdaest <- 1/mean(data)
+  
+ return(lambdaest)
+}
+
+#simulation et appel de la 
+lambda <- c()
+for (i in 1:10000) {
+data <- rexp(20,0.001)
+lambda[i] <- mle.exp.complet(data)
+}
+#lambda
+boxplot(lambda, breaks = seq(0,1,0.02))
+abline(h = 0.001, col="red")
+
+```
+
+
+EXERCICE 3
+
+```{r}
+
+
+#remotes::install_github("rcqls/VAM")
+```
+

@@ -1,0 +1,118 @@
+---
+title: "TP BIOSTAT"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "11 décembre 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+
+library(survival)
+d<-aml
+dim(d)
+```
+1 correspond à une observation et 0 à une censure.
+
+On ne peut pas de summary, histogramme de time. Il faut utiliser les estimateurs de kaplan méier
+
+- time : temps de survie 
+- status : 0 pour une observation censurée et 1 sinon
+- x : maintien d'un traitement par chimiothérapie
+
+2- Créer un objet de type Surv sous R à partir de cette base
+
+```{r}
+
+attach(aml)
+
+base=Surv(time,status == 1)
+
+plot(base)
+```
+
+
+3. Calculer l'estimateur de Kaplan Meier de la survie globale, puis ceux des deux groupes d´ecrits par la variable x maintien du traitement par chimioth´erapie. On pourra utiliser la fonction survfit de R. 
+
+```{r}
+
+survfit(base~1)
+fit<-survfit(base~x)
+
+
+```
+
+Calculer les quartiles de la survie globale
+
+```{r}
+
+quantile(fit$time,c(0.01,0.1,0.5,0.9,0.99))
+```
+
+4. Repr´esenter sur un m^eme graphique ces deux courbes de survie en indiquant par un + les dates ou` ont lieu les censures. Tracer les intervalles de con???ance en rajoutant l'option conf.int. Comparer graphiquement les deux courbes de survie. 
+
+
+```{r}
+
+plot(fit,conf.int = TRUE,col=c("blue","red"))
+
+```
+
+5
+
+```{r}
+test<-0
+for (i in 1:20){
+ test<-test+sum(fit$surv[i]*fit$time[i]*(fit$time[i]-fit$time[i-1]))
+}
+test
+
+fit$time
+fit$surv
+fit$n.censor
+
+difference<-diff(fit$surv*fit$n.censor)
+
+
+fit<-survfit(base~1)
+survie<-fit$surv[fit$n.censor==0]
+temps<-fit$time[fit$n.censor==0]
+temps<-c(0,temps)
+
+moyenne<-survie %*% diff(temps)
+
+```
+
+6. Mettre en place un test de l'hypoth`ese 
+
+```{r}
+
+base<-Surv(time,status)
+
+survdiff(base~x,data=d) #(test du log-rank)
+survdiff(base~x,data=d,rho=1) #(test de log-rank généralisé)
+```
+
+7. Proposer deux estimateurs du risque cumul´e pour la population globale. Les tracer
+
+```{r}
+
+ H<-cumsum(fit$n.event/fit$n.risk)
+
+loga<- -log(survie)
+
+plot(stepfun(fit$time[1:17],H))
+lines(loga,col=TRUE)
+```
+
+
+8. Sur un m^eme graphique, tracer l'estimateur du risque cumul´e pour chaque groupe d´ecrit par la variable "maintien du traitement par chimioth´erapie" (on choisira un des deux estimateurs possibles du risque cumul´e).
+
+```{r}
+
+```
+

@@ -1,0 +1,436 @@
+---
+title: "DATA CHALLENGE FIABILITE"
+author: "AGBLODOE Komi/  Aimé CAZEEL M2 SSD"
+date: "17 décembre 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+#Partie 1
+
+# 1 Fiabilité du système en fonction de $r(x)$
+
+La durée de vie du système vaut: $X = min(max(X_1,X_2),X_3,max(X_4,X_5))$
+
+$$R(x) = \mathbb{P}(X>x)$$
+$$R(x) = \mathbb{P}(min(max(X_1,X_2),X_3,max(X_4,X_5))>x)$$
+$$R(x) = \mathbb{P}(max(X_1,X_2)>x,X_3>x,max(X_4,X_5)>x)$$
+Par indépendance des composants on a:
+
+$$R(x) = \mathbb{P}(max(X_1,X_2)>x)*\mathbb{P}(X_3>x)*\mathbb{P}(max(X_4,X_5)>x)$$
+$$R(x) = (1-\mathbb{P}(max(X_1,X_2)<=x))*\mathbb{P}(X_3>x)*(1-\mathbb{P}(max(X_4,X_5)<=x))$$
+
+$$R(x) = (1-\prod_{k=1}^2\mathbb{P}(X_i<=x))*\mathbb{P}(X_3>x)*(1-\prod_{k=4}^5\mathbb{P}(X_i<=x))$$
+
+
+$$R(x) = (1-\prod_{k=1}^2(1-\mathbb{P}(X_i>x))*\mathbb{P}(X_3>x)*(1-\prod_{k=4}^5(1-\mathbb{P}(X_i>x))$$
+$$R(x) = (1-\prod_{k=1}^2(1-r(x))*r(x)*(1-\prod_{k=4}^5(1-r(x))$$
+
+
+$$R(x) = (1-(1-r(x))^2)*r(x)*(1-(1-r(x))^2)$$
+
+D'oC9 nous avons finalement:  $$R(x) = r(x)*(1-(1-r(x))^2)^2$$
+
+
+#2
+
+Si les composants ont même taux de défaillance $\lambda$, alors on a: $r(x)=exp(-\lambda x)$
+
+En remplaC'ant cette expression de $r(x)$ dans la formule de $R(x)$, on obtient pour:
+
+-fiabilité du système:
+
+$$R(x)= 4*exp(-3\lambda x) + exp(-5\lambda x) - 4*exp(-4\lambda x)$$
+
+-Le taux de défaillance du système est:
+
+$$h(x) = -\frac{d}{dx}ln(R(x))$$
+On obtient après calcul:
+
+$$h(x) = \frac{12 \lambda + 5 exp(-2\lambda x) - 16\lambda exp(-\lambda x)}{4 + exp(-2\lambda x) - 4 exp(-\lambda x)}$$
+
+On a :
+
+$$\lim\limits_{x \to \infty} h(x) = \frac{12 \lambda}{4}$$
+$$\lim\limits_{x \to \infty} h(x) =3\lambda$$
+
+-MTTF du système
+
+$$ MTTF = E(X) = \displaystyle{\int_{0}^{\infty}}(4*exp(-3\lambda x) + exp(-5\lambda x) - 4*exp(-4\lambda x))~\textrm{d}x $$
+
+Après calcul de cette intégrale, on obtient:
+
+$$MTTF = \frac{8}{15\lambda}$$
+Ce qui est bien de l'ordre de la moitié du MTTF d'un composant car $\frac{8}{15}$ est sensiblement égale à  0.5
+
+
+
+#3
+
+Simulation
+
+```{r}
+n<-1000
+lambda<-0.01
+
+X1<-rexp(n,lambda)
+X2<-rexp(n,lambda)
+X3<-rexp(n,lambda)
+X4<-rexp(n,lambda)
+X5<-rexp(n,lambda)
+```
+
+
+Approximations MTTF du système et du MTTF d'un composant
+
+```{r}
+fiabi_X1<- exp(-lambda*X1)
+fiabi_X2<- exp(-lambda*X2)
+fiabi_X3<- exp(-lambda*X3)
+fiabi_X4<- exp(-lambda*X4)
+fiabi_X5<- exp(-lambda*X5)
+
+duree_vie_comp<-c(mean(fiabi_X1),mean(fiabi_X2),mean(fiabi_X3),mean(fiabi_X4),mean(fiabi_X5))
+
+fiab_Syst<-(1-(1-fiabi_X1)*(1-fiabi_X2))*fiabi_X3*(1-(1-fiabi_X4)*(1-fiabi_X5))
+
+duree_vie_syst<-mean(fiab_Syst)
+
+```
+On obtient bien le résultat théorique car la durée de vie du système est presqu'égale C  la moitié de celle d'un composant.
+
+
+#4
+- Fiabilité et taux de défaillance du système
+
+Dans ce cas, il faut mettre en série les deux composants 4 et 5 en série
+
+```{r}
+
+fiab_Syst_2<-(1-(1-fiabi_X1)*(1-fiabi_X2))*fiabi_X3*fiabi_X4*fiabi_X5
+
+
+```
+
+
+-MTTF du système par calcul théorique
+
+Dans ce cas nous avons: $$R(x) = (r(x))^3*(1-(1-r(x))^2) = 2exp(-4\lambda x) - exp(-5\lambda x)$$
+ 
+$$ MTTF = \displaystyle{\int_{0}^{\infty}}(2exp(-4\lambda x) - exp(-5\lambda x))~\textrm{d}x$$
+Après calcul, on obtient:
+
+$$MTTF = \frac{3}{10} \frac{1}{\lambda}$$
+Comparé au MTTF de la question 2 et 3, le MTTF du nouveau système de la question 4 représente le tiers du MTTF d'un composant.
+
+
+
+
+
+
+
+
+# Importation
+```{r}
+A1<-c(194, 15, 41, 29, 33, 181)
+A2<-c(413, 14, 58, 37, 100, 65, 9, 169, 447, 184, 36, 201, 118, 34, 31, 18, 18, 67, 57, 62, 7, 22, 34)
+A3<-c(90, 10, 60, 186, 61, 49, 14, 24, 56, 20, 79, 84, 44, 59, 29, 118, 25, 156, 310, 76, 26, 44, 23, 62, 130, 208, 70, 101, 208)
+A4<-c(74, 57, 48, 29, 502, 12, 70, 21, 29, 386, 59, 27, 153, 26, 326)
+A5<-c(55, 320, 56, 104, 220, 239, 47, 246, 176, 182, 33, 15, 104, 35)
+A6<-c(23, 261, 87, 7, 120, 14, 62, 47, 225, 71, 246, 21, 42, 20, 5, 12, 120, 11, 3,
+14, 71, 11, 14, 11, 16, 90, 1, 16, 52, 95)
+A7<-c(97, 51, 11, 4, 141, 18, 142, 68, 77, 80, 1, 16, 106, 206, 82, 54, 31, 216, 46, 111, 39, 63, 18, 191, 18, 163, 24)
+A8<-c(50, 44, 102, 72, 22, 39, 3, 15, 197, 188, 79, 88, 46, 5, 5, 36, 22, 139, 210, 97, 30, 23, 13, 14)
+A9<-c(359, 9, 12, 270, 603, 3, 104, 2, 438)
+A10<-c(50, 254, 5, 283, 35, 12)
+A11<-c(130, 493)
+A12<-c(487, 18, 100, 7, 98, 5, 85, 91, 43, 230, 3, 130)
+A13<-c(102, 209, 14, 57, 54, 32, 67, 59, 134, 152, 27, 14, 230, 66, 61, 34)
+
+data<-list(A1,A2,A3,A4,A5,A6,A7,A8,A9,A10,A11,A12,A13)
+```
+
+Nous avons `r length(data)` appareils.
+
+# Description
+
+Nous avons ici les durées de vies de 13 appareils. Il ne semble pas y avoir de censure, nous avons donc des données complètes. Il s'agit des durées de fonctionnement successives d'appareils d'air conditionné dans 13 Boeing 720. Un appareil defaillant est remplacé par un appareil similaire neuf.
+
+# Objectif
+
+Nous cherchons à étudier la fiabilité, le taux de défaillance et le MTTF des appareils. Nous cherchons aussi à savoir si il existe une différence entre les appareils.
+
+# Calcul exploratoire
+
+## MTTF empirique
+
+La durée de vie moyenne peut être empiriquement calculé pour chaque appareil. Nous pouvons aussi supposer qu'il n'y a pas de différence entre les appareils et calculer un MTTF global empirique.
+
+```{r}
+MTTFe<-c()
+dataall<-c()
+datagr<-matrix(data=NA,nrow=1,ncol=2)
+for (i in 1:length(data)) {
+  MTTFe<-c(MTTFe,mean(data[[i]]))
+  dataall<-c(dataall,data[[i]])
+  datagr<-rbind(datagr,cbind(i,data[[i]]))
+}
+datagr<-datagr[-1,]
+print("MTTF empirique")
+print(MTTFe)
+MTTFge<-mean(dataall)
+print("MTTF empirique global")
+print(MTTFge)
+```
+
+On observe des différences entre les MTTF des appareils. Ces différences sont elles significatives ? Pour vérifier cela, nous allons réaliser une analyse ANOVA.
+
+```{r}
+fit<-aov(datagr[,2]~datagr[,1])
+summary(fit)
+```
+
+A priori, il ne semble pas y avoir de différence significative concernant la durée de vie des appareils.
+
+## Analyse graphique
+
+Nous allons étudier ici deux possibilités :
+
+*Hypothèse 1 : taux de défaillance constant (loi exponentielle)
+*Hypothèse 2 : taux de défaillance non constant (loi de Weibull)
+
+On suppose en premier lieu que les appareils ont un taux de défaillance constant. Nous pouvons donc modéliser cela par une loi exponentielle. Nous estimons $\lambda$ par l'inverse du MTTF empirique. Nous envisager deux cas : les appareils sont tous identiques et les appareils sont tous différents.
+
+On suppose ensuite que les appareils ont un taux de défaillance non constant. Nous pouvons donc modéliser cela par une loi de Weibull. Nous estimons $\eta$ et $beta$ par leur estimateur paramétrique. De même ici, nous envisageons les deux cas, c'est à dire soit que les appareils sont différents soit qu'ils sont identique.
+
+```{r}
+lambda<-1/MTTFe
+lambdag<-1/MTTFge
+
+weibparam<-function(beta,x){
+  return((1/beta)+mean(log(x))-(sum((x**beta)*log(x)))/(sum(x**beta)))
+}
+
+betag<-uniroot(weibparam,interval=c(0,3),x=dataall)$root
+etag<-mean(data[[i]]**betag)**(1/betag)
+
+```
+
+```{r,warning=FALSE}
+adequation<-matrix(data = NA,nrow=1,ncol=4)
+
+for (i in 1:length(data)) {
+  test<-c()
+  beta<-uniroot(weibparam,interval=c(0,3),x=data[[i]])$root
+  eta<-mean(data[[i]]**beta)**(1/beta)
+  
+  mini<-min(data[[i]])
+  maxi<-max(data[[i]])
+  
+  calcul<-ecdf(data[[i]])
+  
+  curve(1-calcul(x),from = mini,to=maxi,main=paste("Fiabilité pour l'appareil",i),ylab="R(x)")
+  
+  curve(exp(-lambda[i]*x),from = mini,to=maxi,add=TRUE,col="red")
+  test<-c(test,ks.test(y=exp(-lambda[i]*data[[i]]),x=1-calcul(data[[i]]))$p.value)
+  
+  curve(exp(-lambdag*x),from = mini,to=maxi,add=TRUE,col="dark red")
+  test<-c(test,ks.test(y=exp(-lambdag*data[[i]]),x=1-calcul(data[[i]]))$p.value)
+  
+  curve(exp(-(x/eta)**beta),from = mini,to=maxi,add=TRUE,col="green")
+  test<-c(test,ks.test(y=exp(-(data[[i]]/eta)**beta),x=1-calcul(data[[i]]))$p.value)
+  
+  curve(exp(-(x/etag)**betag),from = mini,to=maxi,add=TRUE,col="dark green")
+  test<-c(test,ks.test(y=exp(-(data[[i]]/etag)**betag),x=1-calcul(data[[i]]))$p.value)
+  
+  legend(maxi*2.8/4, 0.5, legend=c(paste0("Exp(",round(lambda[i],3),")"),paste0("Exp(",round(lambdag,3),")"),paste0("Weibull(",round(beta,2),";",round(eta,2),")"),paste0("Weibull(",round(betag,2),";",round(etag,2),")")),
+       col=c("red", "dark red","green","dark green"), lty=1, cex=0.8)
+  
+  adequation<-rbind(adequation,test)
+  
+}
+
+adequation<-adequation[-1,]
+colnames(adequation)<-c("exp","exp global","weibull","weibull global")
+
+```
+
+Nous pouvons observer que même si nous pouvons trouver un modèle specifique pour chaque appareil, dans l'ensemble, les appareils semblent avoir la même loi de durée de fonctionnement. Avec des tests de Kolmogorov-Smirnov, nous remarquons que nous ne rejetons pratiquement jamais l'hypothèse nulle : les appareils semblent provenir de la même. Celle-ci peut être exponentielle ou Weibull. Néanmoins, il semble plus logique de considérer une loi de Weibull.
+
+Néanmoins, l'analyse graphique ne nous permet pas d'exclure de façon absolue la possibilité que les appareils soient de différentes lois. En effet, graphiquement on peut observer des taux de fiabilité légèrement différent, néanmoins, cela peut s'expliquer aussi par la différence du nombres de pannes entre les appareils.
+
+### Taux de defaillances
+
+#### Cas constant
+
+```{r}
+plot(lambda,xlab="Appareil")
+abline(h=lambdag,col="dark red")
+```
+
+Nous pouvons observer qu'il semble exister des différences de taux de défaillance entre les appareils. Si dans l'ensemble, les taux de défaillances sont tous très faibles, nous observons qu'ils le sont surtout pour les appareils 9 et 11.
+
+#### Cas non constant
+
+```{r}
+curve((betag/etag)*(x/etag)**(betag-1),main=paste("Defaillance pour l'appareil"),ylab="Taux de defaillance",col="dark green",ylim=c(0,0.08))
+
+for (i in 1:length(data)) {
+  beta<-uniroot(weibparam,interval=c(0,3),x=data[[i]])$root
+  eta<-mean(data[[i]]**beta)**(1/beta)
+  curve((beta/eta)*(x/eta)**(beta-1),add=TRUE,col=i)
+}
+
+legend(0.8, 0.08, legend=c(1:13,"weibull global"),
+       col=c(1:13,"dark green"), lty=1, cex=0.8)
+```
+
+Si globalement, nous observons un taux de defaillance qui rajeunit avec le temps, nous observons que ce n'est pas une généralité. Le rajeunissement semble abérant pour un seul appareil, mais en sachant que l'on remplace un appareil par un neuf après une défaillance, cela peut sembler moins abérant.
+
+
+# Conclusion
+
+Dans l'ensemble nous pouvons constater que bien que l'on observe des différences entre les appareils, ces différences ne sont pas significativement différentes d'un modèle unique. Cela se confirme lorsque l'on regarde dans le cas constant les taux de defaillances : il ne semble pas y avoir de très grande différences. De même pour le MTTF. Bien que les fiabilités des différents appareils soient différentes, elles ne se distinguent finalement que très peu d'un même modèle. Il se peut donc que certains appareils se distinguent légèrement des autres, mais dans l'ensemble les appareils semblent suivre les même durée de fonctionnement.
+
+
+
+
+PARTIE 3
+
+```{r}
+
+data<-readxl::read_xlsx("DataChallengePartie3.xlsx")
+```
+
+
+Transformation des données
+
+```{r}
+
+
+d<-matrix(NA, nrow = 1, ncol = 4)
+colnames(d)<-c("Site","Systeme","Temps","MP")
+
+for (i in seq(1,32,2)){
+  cl<-data[2:13,c(i,i+1)]
+  cl<-cbind((i+1)/2,cl)
+  cl<-cbind(1+as.numeric(i>16),cl)
+  colnames(cl)<-colnames(d)
+  
+  d<-rbind(d,cl)
+  
+}
+
+d<-d[!is.na(d["Temps"]),]
+d[d[,"MP"]==0,"MP"]<--1
+d[,"MP"]<-as.numeric(d[,"MP"])
+d[,"Temps"]<-as.numeric(d[,"Temps"])
+
+```
+
+
+MLE
+
+```{r}
+
+require(VAM)
+
+ORE_mle<- mle.vam( Systeme&Temps&MP ~ (ARA1(0.5) | LogLinear(1,1e-5)) & (ARAInf(0.5)),data=d)
+
+coef(ORE_mle)
+```
+
+```{r}
+plot(ORE_mle,"v")
+```
+
+
+
+
+
+
+On sait que nos systèmes sont soumis à  des maintenances correctives et des maintenances préventives. Il est communément admis que le smaintenances correctives sont des opérations de mise en route après défaillance tandis que les maintenances préventives ont tendance à  permettre une amélioriation de l'état du système.
+C'est pourquoi nous faisons un premier modèle avec les maintenances correctives de type ABAO et maintenances préventives de typa ARA1.
+
+Site 1
+```{r}
+
+data_ABAO_LL<-model.vam(Systeme&Temps&MP ~ (ABAO()|LogLinear(1,1e-5)) & (ARA1(0.5)),data=d[d$Site==1,])
+plot(data_ABAO_LL ,"v")
+
+                      
+```
+
+
+Site 2
+```{r}
+
+data_ABAO_LL<-model.vam(Systeme&Temps&MP ~ (ABAO()|LogLinear(1,1e-5)) & (ARA1(0.5)),data=d[d$Site==2,])
+plot(data_ABAO_LL ,"v")
+```
+
+
+On observe que ces résultats ne réflètent pas la réalité de nos données.
+En effet l'hypothèse de simple remise en route pour les maintenances correctives provoquent une augmentation trop importante de l'âge virtuel.
+On devrait observer dans nos données des durées de vie de plus en courtes alors que ce n'est pas le cas.
+Nous testons le fait que les maintenances correctives améliorent l'état des systèmes comme les maintenances préventives.
+
+Site 1
+```{r}
+
+data_LL<-model.vam(Systeme&Temps&MP ~ (ARA1(0.5)|LogLinear(1,1e-5)) & (ARA1(0.5)),data=d[d$Site==1,])
+plot(data_LL ,"v")
+```
+
+
+
+Site 2
+```{r}
+data_LL<-model.vam(Systeme&Temps&MP ~ (ARA1(0.5)|LogLinear(1,1e-5)) & (ARA1(0.5)),data=d[d$Site==2,])
+plot(data_LL ,"v")
+
+```
+
+
+
+On observe le même problème mais pas autant que précédemment.
+Nous savons que les maintenances préventives coC;tent 5 fois plus chères que les maintenances correctives.
+On peut donc supposer qu'elles ont une influence plus importante sur l'amélioration des systèmes que les maintenances correctives.
+Nous aller tester maintenant un modèle avec les maintenances préventives de type ARAInf et les maintenances correctives de type ARA1.
+
+Site 1
+```{r}
+ORE_modele_1<- model.vam( Systeme&Temps&MP ~ (ARA1(0.5) | LogLinear(1,1e-5)) & (ARAInf(0.5)),data=d[d$Site==1,])
+
+
+plot(ORE_modele_1,"v") 
+
+```
+
+Site 2
+
+```{r}
+
+ORE_modele_2<- model.vam( Systeme&Temps&MP ~ (ARA1(0.5) | LogLinear(1,1e-5)) & (ARAInf(0.5)),data=d[d$Site==2,])
+
+
+plot(ORE_modele_2,"v")
+```
+
+
+```{r}
+ORE_mle_1<- mle.vam( Systeme&Temps&MP ~ (ARA1(0.5) | LogLinear(1,1e-5)) & (ARAInf(0.5)),data=d[d$Site==1,])
+coef(ORE_mle_1)
+
+ORE_mle_2<- mle.vam( Systeme&Temps&MP ~ (ARA1(0.5) | LogLinear(1,1e-5)) & (ARAInf(0.5)),data=d[d$Site==2,])
+coef(ORE_mle_2)
+
+
+
+
+```
+

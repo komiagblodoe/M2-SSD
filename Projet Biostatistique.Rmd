@@ -1,0 +1,230 @@
+---
+title: "Projet BIOSTATISTIQUE"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "28 décembre 2019"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+
+```{r}
+
+library(survival)
+
+head(ovarian)
+dim(ovarian)
+attach(ovarian)
+
+```
+
+
+###I. Estimateur de Kaplan-Meier et tests de comparaison
+
+
+###1. Quel est le pourcentage d’observations censurées dans le jeu de données?
+
+```{r}
+length(fustat[fustat==0])/length(fustat)
+
+```
+53,84% des données sont censurées. Soit environ 54%.
+
+
+###2. Quelle quantité est estimée par l’estimateur de Kaplan-Meier ?
+
+La fonction de survie ou la probabilité de survie est la quantité estimée par l’estimateur de Kaplan-Meier.
+
+```{r}
+base<-Surv(futime,fustat)
+fit<-survfit(base~1,data=ovarian)
+plot(fit,mark.time=TRUE,conf.int=FALSE,col=c(1,2))
+
+```
+
+###Commenter le graphique représentant l’estimateur de Kaplan-Meier pour tous les groupes confondus:
+Le temps de survie médian est estimé à 638 jours pour tous les groupes.
+
+###On donnera notamment les estimations des quartiles de la loi de T (c’est à dire les quantiles d’ordre 25%, 50% et 75%)
+
+```{r}
+quantile(fit,c(.25,.5,.75))$quantile
+
+```
+
+
+###3. A combien estimez-vous la probabilité qu’une patiente atteinte du cancer des ovaires vive moins de 200 jours ? Qu’elle vive plus de 600 jours ?
+
+```{r}
+
+
+fn<-stepfun(fit$time,c(0,fit$surv))
+
+proba_200_jours<-1-fn(200)
+proba_600_jours<-fn(600)
+```
+la probabilité qu’une patiente atteinte du cancer des ovaires vive moins de 200 jours est de 0.115 et de 0.546 qu’elle vive plus de 600 jours.
+
+###4. On s’intéresse dans un premier temps à l’influence du traitement sur la survie des patients. D’un point de vue descriptif vous semble-t-il que le traitement permette d’augmenter la durée de vie des patients ?
+
+```{r}
+base<-Surv(futime,fustat)
+fit<-survfit(base~rx,data=ovarian)
+plot(fit,mark.time=TRUE,conf.int=FALSE,col=c(1,2))
+legend("bottomleft", c("Traitement A","Traitement B"),col=c(1,2),lty=1)
+```
+D’un point de vue descriptif, il semble que le traitement permette d’augmenter la durée de vie des patients. Le traitement B semble augmenter la durée de vie des patients comparé au traitement A.
+
+###5. Quel test statistique proposez-vous pour comparer la survie des patients en fonction du traitement ? On donnera les hypothèses nulle et alternative. 
+
+Pour comparer la survie des patients, on propose pour test statistique celui du log-rank
+
+Notons $S_A$ et $S_B$ les fonctions de survie des groupes A et B.
+On souhaite tester:
+
+$(H_0): S_A = S_B$  contre  $(H_1): S_A \ne S_B$
+
+
+```{r}
+base<-Surv(futime,fustat)
+
+survdiff(base~rx,data=ovarian) 
+```
+###Commenter le résultat du test:
+
+Au regard de la p-valeur obtenue, on ne rejette pas l'hypothèse nulle $H_0$. Les deux courbes de survie ne sont pas significativement différentes au seuil $\alpha = 5\%$. On ne peut pas conclure à un effet de traitement.
+
+###6. On s’intéresse enfin à la survie des patients en fonction de la variable resid.ds.
+###Commenter le graphique ainsi que le test associé permettant de comparer la survie des patients en fonction de cette variable.Quel est l’impact de la présence de la maladie sur la durée de vie d’un patient ?
+
+```{r}
+base<-Surv(futime,fustat)
+
+fit2<-survfit(base~resid.ds,data=ovarian)
+plot(fit2,mark.time=TRUE,col=c(1,2))
+legend("bottomleft", c("resid.ds=1","resid.ds=2"),col=c(1,2),lty=1)
+```
+Graphiquement, il semble avoir un écart significatif entre les fonctions de survie. Graphiquement, on peut affirmer que l'absence de résidus permet d'augmenter la durée de survie.
+
+Faisons le test du log-rank:
+
+```{r}
+survdiff(base~resid.ds,data=ovarian) #(test du log-rank)
+```
+Au regard de la p-valeur obtenue (p=0.06), on ne rejette pas l'hypothèse nulle d'égalité des fonctions de survie au seuil $\alpha=5\%$.
+
+###Par exemple, au bout de 400 jours, donner une estimation de la probabilité d’être toujours en vie en fonction de la présence au nom de residus de maladie.
+
+```{r}
+summary(fit2)
+```
+Au bout de 400 jours, la probabilité d’être toujours en vie est estimée à 0.6 s'il y a présence de résidus et 0.909 s'il n'y a pas de présence de résidus.
+
+
+###II. Modèle de Cox
+
+###1. On propose maintenant d’expliquer la variable temps de survie en fonction de la variable rx par un modèle de Cox. Ecrire le modèle de Cox correspondant
+
+```{r}
+
+base<-Surv(futime,fustat)
+fit3<-coxph(base ~ rx,data=ovarian)
+
+```
+
+
+###2.
+
+Le rapport des risques (ou hazard ratio) noté $RR$ correspond au fait que le risque instantané est multiplié par $RR$ pour un individu appartenant au groupe ayant eu une thérapie antérieure.
+
+###Donner l’estimation du rapport de risque instantané comparant le groupe ayant eu le traitement B par rapport au traitement A
+
+```{r}
+fit3
+```
+Le rapport de risque instantané comparant le groupe ayant eu le traitement B par rapport au traitement A est estimé à 0.55
+
+###Commenter:
+
+Le taux de risque instantané des patients sous le traitement B est 0.55 fois plus petit que celui des patients suivant le traitement A.
+
+###3. Donner les hypothèses de test de l’influence de la variable rx sur le temps de survie.
+###Proposer trois tests de l’influence de la variable rx sur le temps de survie. Commenter le
+programme correspondant et les résultats obtenus. Que concluez-vous ?
+
+Notons $\beta$ la mesure d'influence de la variable $rx$. Les hypothèses du test sont:
+
+$(H_0): \beta = 0$ contre $(H_1): \beta \ne 0$
+
+On propose les tests de wald, du rapport de vraisemblance et du score pour tester l'influence de la variable $rx$ sur le temps de survie.
+
+
+```{r}
+summary(fit3)
+```
+Au regard des p-valeurs obtenues pour chacun de ces trois tests (p=0.3), on ne rejette pas l'hypothèse nulle au seuil $\alpha=5\%$. On conclut que $\beta=0$.
+
+###4. Commenter brièvement les deux modèles de Cox univariés pour les variables age et ecog.ps.
+###Ces deux variables ont-elles un effet sur la survie des patients ?
+
+```{r}
+
+base<-Surv(futime,fustat)
+fit_age<-coxph(base ~ age,data=ovarian)
+fit_ecog.ps<-coxph(base ~ ecog.ps,data=ovarian)
+
+```
+
+Faisons les trois tests sur les modèles précédents
+
+```{r}
+summary(fit_age)
+```
+Au regard des p-valeurs des trois tests (toutes inférieures à 0.05), on conclut que la variable age a un effet sur la survie des patients.
+
+```{r}
+summary(fit_ecog.ps)
+```
+Au regard des p-valeurs des trois tests (toutes supérieures à 0.05), on conclut que la variable ecog.ps n'a pas d'effet sur la survie des patients.
+
+###5. Écrire le modèle de Cox complet (avec toutes les variables explicatives). Discuter les effets des différentes variables.
+
+Modèle de Cox complet
+```{r}
+fit4<-coxph(base ~ age+resid.ds+rx+ecog.ps,data=ovarian)
+summary(fit4)
+```
+Au regard des différentes p-valeurs pour les différentes variables, seule la variable age a un effet significatif.
+
+###6. Proposer une méthode de sélection de variables pour le modèle de Cox. Quelles sont les
+variables sélectionnées par ce critère ?
+
+
+```{r}
+model_final<-step(fit4, dir = "backward")
+```
+La variable age est la seule qui est sélectionnée par cette méthode de sélection de variables.
+
+###7. Quelles sont les hypothèses de modélisation que doit vérifier un modèle de Cox ? Détaillez
+votre réponse.
+
+Un modèle de Cox doit vérifier:
+
+-l’hypothèse des risques proportionnels: l’effet de chacune des
+covariables du modèle est indépendant du temps (risque relatif constant au cours du temps). 
+
+-l’hypothèse de log-linéarité pour une covariable continue: le risque relatif d’une augmentation d’une unité de la covariable est constant.
+
+###8. Implémenter sous R cette validation pour le modèle final. Commenter.
+
+Test de l'hypothèse des risques proportionnels:
+```{r}
+model_final_test<-cox.zph(model_final)
+model_final_test
+```
+
+On ne rejette pas l'hypothèse des risques proportionnels compte tenu de la p-valeur du test (supérieure à 0.05)
+
+
+

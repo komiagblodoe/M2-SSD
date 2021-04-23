@@ -1,0 +1,220 @@
+---
+title: "Untitled"
+author: "MARTHINET"
+date: "20 janvier 2020"
+output: html_document
+---
+
+```{r}
+library(randomForest)
+spectra_train <- read.csv2("C:/Users/Jean/Desktop/Cours/SSD/M2/Fouille de données/Data challenge/spectra-train.csv", header = FALSE)
+meta_train <- read.csv2("C:/Users/Jean/Desktop/Cours/SSD/M2/Fouille de données/Data challenge/meta-train.csv")
+
+spectra_test <- read.csv2("C:/Users/Jean/Desktop/Cours/SSD/M2/Fouille de données/Data challenge/spectra-test.csv", header = FALSE)
+meta_test <- read.csv2("C:/Users/Jean/Desktop/Cours/SSD/M2/Fouille de données/Data challenge/meta-test.csv")
+
+spectra_train <- apply(spectra_train, 2, as.numeric)
+spectra_test <- apply(spectra_test, 2, as.numeric)
+
+meta_train[,1] <- as.factor(as.numeric(gsub("sp_", "", as.character(meta_train[,1]))))
+```
+
+
+```{r}
+var_spectres <- apply(spectra_train, 1, var)
+plot(var_spectres)
+var_souche <- tapply(var_spectres, rep(1:346, each = 9), mean)
+plot(var_souche)
+souche_outliers <- as.numeric(names(sort(var_souche, decreasing = TRUE)[1:3]))
+individu_outliers <- which(meta_train[,2] %in% souche_outliers)
+```
+
+
+```{r}
+spectra_train_classes <- matrix(NA, nrow = 42, ncol = 627)
+for (i in 1:42) {
+  spectra_train_classes[i,] <- apply(spectra_train[meta_train[,1] == i,], 2, mean)
+}
+
+cols <- rainbow(42)
+plot(spectra_train_classes[1,], type = "l")
+for (i in 2:42) {
+  lines(x = 1:627, y = spectra_train_classes[i,], col = cols[i])
+}
+
+barplot(table(meta_train[,1])/9)
+```
+
+
+```{r}
+library(FactoMineR)
+res.pca <- PCA(spectra_train[-individu_outliers,], graph = FALSE)
+
+barplot(res.pca$eig[1:20,2])
+
+contrib_pp <- apply(res.pca$var$contrib[,1:2], 1, sum)
+var_signif_ACP <- names(sort(contrib_pp, decreasing = TRUE)[1:80])
+ind_var_signif_ACP <- as.numeric(gsub("V", "", var_signif_ACP))
+#sort(ind_var_signif)
+```
+
+```{r}
+library(glmnet)
+lasso <-glmnet(spectra_train,as.numeric(as.vector(meta_train[,1])),standardize=FALSE,alpha=1)
+plot(lasso,xvar="lambda")
+var_signif_lasso <- names(lasso$beta[,35][lasso$beta[,35] != 0])
+ind_var_signif_lasso <- as.numeric(gsub("V", "", var_signif_lasso))
+```
+
+
+```{r}
+sort(ind_var_signif_ACP)
+sort(ind_var_signif_lasso)
+ind_var_signif <- sort(unique(c(ind_var_signif_ACP, ind_var_signif_lasso)))
+```
+
+
+```{r}
+n <- nrow(spectra_train)
+ind_ligne <- sample.int(n, floor(0.7*n))
+
+X_train <- spectra_train[ind_ligne,]
+X_test <- spectra_train[-ind_ligne,]
+Y_train <- meta_train[ind_ligne,1]
+Y_test <- meta_train[-ind_ligne,1]
+
+
+### Avec variables significatives
+model_signif <- randomForest(meta_train[,1] ~ ., data = spectra_train[,ind_var_signif_lasso], 
+                             ntree = 800, na.action = na.omit,
+                             classwt = rep(1/42, 42))
+
+#hist(model_signif$oob.times)
+#plot(model_signif$importance)
+
+pred <- as.numeric(as.vector(predict(model_signif, X_test)))
+sum(pred == Y_test)/length(pred) 
+
+pred_prob <- as.numeric(as.vector(predict(model_signif, X_test, type = 'prob')))
+pred_prob <- matrix(data = pred_prob, ncol = 42)
+pred_prob <- apply(pred_prob, 1, which.max)
+sum(pred_prob == Y_test)/length(pred_prob) 
+
+### Avec tout
+model_all <- randomForest(Y_train ~ ., data = X_train, ntree = 500, na.action = na.omit,
+                             classwt = rep(1/42, 42))
+
+#hist(model$oob.times)
+#plot(model_all$importance)
+
+
+
+pred <- as.numeric(as.vector(predict(model_all, X_test)))
+sum(pred == Y_test)/length(pred)
+
+#### Variables importantes
+
+p <- varImpPlot(model_all)
+var_imp <- sort(p, decreasing = TRUE)[1:50]
+ind_var_imp <- which(p %in% var_imp)
+
+model_imp <- randomForest(Y_train ~ ., data = X_train[,ind_var_imp], 
+                             ntree = 500, na.action = na.omit,
+                             classwt = rep(1/42, 42))
+
+pred_imp <- as.numeric(as.vector(predict(model_imp, X_test)))
+sum(pred_imp == Y_test)/length(pred_imp) 
+```
+
+```{r}
+library(e1071)
+### Avec variables significatives
+model_signif <- svm(Y_train ~ ., data = X_train[,ind_var_signif_lasso], na.action = na.omit)
+
+pred <- as.numeric(as.vector(predict(model_signif, X_test)))
+sum(pred == Y_test)/length(pred) 
+
+
+
+
+model_signif <- svm(Y_train ~ ., data = X_train[,ind_var_imp], na.action = na.omit)
+
+pred <- as.numeric(as.vector(predict(model_signif, X_test)))
+sum(pred == Y_test)/length(pred) 
+```
+
+
+
+```{r}
+par(mfrow = c(1,2))
+
+nb_var <- seq(10,100,5)
+accuracy <- rep(NA, length(nb_var))
+
+for (i in 1:length(nb_var)) {
+  var_imp <- sort(p, decreasing = TRUE)[1:nb_var[i]]
+  ind_var_imp <- which(p %in% var_imp)
+  
+  model_signif <- randomForest(Y_train ~ ., data = X_train[,ind_var_imp], 
+                               ntree = 500, na.action = na.omit,
+                               classwt = rep(1/42, 42))
+  
+  pred <- as.numeric(as.vector(predict(model_signif, X_test)))
+  accuracy[i] <- sum(pred == Y_test)/length(pred) 
+}
+
+
+
+
+
+nb_arbres <- seq(500,1500,100)
+accuracy2 <- rep(NA, length(nb_arbres))
+
+for (i in 1:length(nb_arbres)) {
+  var_imp <- sort(p, decreasing = TRUE)[1:40]
+  ind_var_imp <- which(p %in% var_imp)
+  
+  model_signif <- randomForest(Y_train ~ ., data = X_train[,ind_var_imp], 
+                               ntree = nb_arbres[i], na.action = na.omit,
+                               classwt = rep(1/42, 42))
+  
+  pred <- as.numeric(as.vector(predict(model_signif, X_test)))
+  accuracy2[i] <- sum(pred == Y_test)/length(pred) 
+}
+
+par(mfrow = c(1,2))
+plot(x = nb_var, y=accuracy, ylab = "Accuracy", xlab = "Nombre de variables (avec 500 arbres)", type ='b')
+plot(x = nb_arbres, y=accuracy2, ylab = "Accuracy", xlab = "Nombre d'arbres (avec 40 variables)", type ='b')
+```
+
+
+```{r}
+library(nnet)
+pm.nnet <- nnet(Y_train ~ ., data = X_train[,ind_var_signif_lasso], skip = FALSE, size = 12, maxit =1000)
+pred.pm.nnet <- as.numeric(predict(pm.nnet,newdata=X_test,type="class"))
+sum(pred.pm.nnet == Y_test)/length(pred.pm.nnet) 
+```
+
+
+```{r}
+pred <- as.numeric(as.vector(predict(model_signif, spectra_test)))
+tables <- tapply(pred, meta_test, table)
+
+pred_test <- rep(NA, 133)
+egalite <- rep(NA, 133)
+for (i in 1:133) {
+  if (sum(tables[[i]] == max(tables[[i]])) > 1) {
+    choix <- as.numeric(names(tables[[i]] == max(tables[[i]]))[tables[[i]] == max(tables[[i]])])
+    pred_prob <- as.numeric(as.vector(predict(model_signif, spectra_test[((i-1)*9+1):((i-1)*9+9),], 
+                                              type = 'prob')))
+    pred_prob <- matrix(data = pred_prob, ncol = 42)
+    pred_prob <- pred_prob[, choix]
+    pred_test[i] <- choix[as.numeric(names(which.max(table(apply(pred_prob, 1, which.max)))))]
+  } else {
+    pred_test[i] <- names(which.max(tables[[i]]))
+  }
+}
+pred_test <- paste0("sp_", pred_test)
+write.table(matrix(pred_test, ncol = 1), file = "predictions.txt")
+```
+
