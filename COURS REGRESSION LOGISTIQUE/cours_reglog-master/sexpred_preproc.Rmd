@@ -1,0 +1,151 @@
+---
+title: "Data challenge `sexpred`"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=TRUE, results="hide")
+```
+
+# Problématique
+
+Trouver un modèle en mesure de prédire le sexe d’une série de patients.
+
+
+# Méthodes statistiques utilisées
+
+## Statistique descriptives
+
+
+```{r}
+d = readRDS("data_learn.rds")
+head(d[,1:19])
+table(d$sex, useNA="ifany")
+table(d$histology, useNA="ifany")
+table(d$sex,d$histology, useNA="ifany")
+table(d$tissue_status, useNA="ifany")
+
+```
+
+## Modèle
+
+Regression logiostique univarié pour chaque gène
+
+```{r}
+# defining sex as 0 or 1 
+s = as.numeric(d$histology == "TCGA-LUAD")
+s
+
+# get gene names
+gs = colnames(d)[13:1012]
+g = gs[1]
+d[[g]]
+# g = "ATP10B"
+
+
+layout(matrix(1:2, 1), respect=TRUE)
+boxplot(d[[g]]~s)
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(c(s,0,0,1,1)~c(d[[g]],0,max(d[,gs]),0,max(d[,gs])), 
+  family = binomial(logit))
+summary(m)$coefficients
+pv = summary(m)$coefficients[2,4]
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d[[g]]):max(d[[g]])
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+
+
+
+layout(matrix(1:2, 1), respect=TRUE)
+g = "SNORA8"
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+plot(c(d[[g]],0,max(d[,gs]),0,max(d[,gs])), c(s,0,0,1,1), main=paste0("sex~",g), xlab=g, ylab="sex")
+
+res = sapply(gs, function(g) {
+  print(g)
+  m = glm(c(s,0,0,1,1)~c(d[[g]],0,max(d[,gs]),0,max(d[,gs])), 
+    family = binomial(logit))
+  b = m$coefficients[[2]]
+  pv = summary(m)$coefficients[2,4]
+  c(pval = pv,beta = b)
+})
+
+res = t(res)
+res = as.data.frame(res)
+head(res)
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(res$beta, -log10(res$pval), main="volcano plot")
+text(res$beta, -log10(res$pval), rownames(res))
+plot(-log10(res$pval), main="Manhattan plot")
+text(res$beta, -log10(res$pval), rownames(res))
+rownames(res)[which(res$pval == min(res$pval))]
+
+plot(res$beta, -log10(res$pval), main="volcano plot")
+text(res$beta, -log10(res$pval), rownames(res))
+
+
+
+g = "USP9Y"
+
+layout(matrix(1:2, 1), respect=TRUE)
+boxplot(d[[g]]~s)
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d[[g]], family = binomial(logit))
+summary(m)$coefficients
+pv = summary(m)$coefficients[2,4]
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d[[g]]):max(d[[g]])
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+
+g = "LINC02428"
+
+layout(matrix(1:2, 1), respect=TRUE)
+boxplot(d[[g]]~s)
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d[[g]], family = binomial(logit))
+summary(m)$coefficients
+pv = summary(m)$coefficients[2,4]
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d[[g]]):max(d[[g]])
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+
+```
+
+
+
+# Discussion et interprétation
+
+USP9Y est un gène du chromosome Y. Cela semble probant qu’il soit un bon prédicteur du sex.
+
+
+
+# Session Information
+
+```{r results="verbatim"}
+sessionInfo()
+```
+
+
+
+
+
+
+
+
+
+

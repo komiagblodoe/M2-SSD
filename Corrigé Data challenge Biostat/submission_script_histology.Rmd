@@ -1,0 +1,112 @@
+---
+title: "Submission script (histpred)"
+output: 
+  rmarkdown::html_document
+---
+
+Please use the `submission_script_histology.Rmd` contained in the `starting_kit` folder as a template to write, run and save your code.
+
+## Prediction of the patient histology
+
+```{r echo=TRUE, results="verbnatim", label="generate_zip_file"}
+### DO NOT CHANGE THIS PART
+d <- readRDS("data_learn.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    d[[ v ]] <- as.factor(x = d[[ v ]])
+}
+colnames(d) = gsub("-", "_", colnames(d))
+#summary(object = d)
+
+test <- readRDS("data_test_histology.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    test[[ v ]] <- as.factor(x = test[[ v ]])
+}
+colnames(test) = gsub("-", "_", colnames(test))
+
+#summary(object = test)
+
+
+cross_scores = sapply(1:10, function(seed) {
+  set.seed(seed)
+  print(seed)
+  idx_valid = sample(rownames(d), 100)
+  idx_learn = setdiff(rownames(d), idx_valid)
+  d_learn = d[idx_learn,]
+
+  scores <- sapply(13:1012,function(i) {
+    g = colnames(d_learn)[i]
+    print(g)
+    # g = "LINC02428"
+    m <- glm(as.formula(paste("histology ~", g)),data = d_learn, family = binomial(logit)) 
+    #ajout de 4 points 0,0,1,1 aléatoires
+    pred <- predict.glm(object = m, newdata = d[idx_valid,], type = "response")
+    idx  <- pred <= 0.5
+    pred[  idx ] <- levels(x = d$histology)[ 1 ]
+    pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+    table(pred, useNA = "ifany")
+    score = sum(pred==d[idx_valid,]$histology)
+    score
+  
+    # b <- m$coefficients[2]
+    # pv <- summary(m)$coefficients[2,4]
+    # c(pval = pv,beta = b, score = score)
+  })
+  # barplot(table(scores))
+  scores  
+})
+rownames(cross_scores) = colnames(d_learn)[13:1012]
+dim(cross_scores)
+plot(apply(cross_scores, 1, mean), apply(cross_scores, 1, sd), col=0)
+text(apply(cross_scores, 1, mean), apply(cross_scores, 1, sd), rownames(cross_scores))
+  
+
+## PUT YOUR SCRIPT HERE
+model <- glm(
+    formula = histology ~ KRT33A + SPDEF + SERPINB5 
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+
+### DO NOT CHANGE THIS PART
+saveRDS(pred, "results.rds")
+zip_filename <- paste0(
+    "results_"
+  , format(x = Sys.time( ), format = "%Y_%m_%d_-_%s")
+  , ".zip"
+)
+if ( !{ "zip" %in% installed.packages( ) } ) {
+    install.packages(pkgs = "zip")
+}
+zip(zip_filename, "results.rds")
+print(zip_filename)
+```
+
+## Submit zip file
+
+It generates *`r zip_filename`* submission file.
+
+Submit the zip submission file in the `Participate` tab of the codalab challenge by clicking the `Submit` button.
+
+The metric used to evaluate prediction is the true positive rate (TPR) coded with the provided `scoring_function()`.
+
+On the codalab challenge web page, The *STATUS* become : 
+
+  - Submitting
+  - Submitted	
+  - Running
+  - Finished
+
+When it’s finished: 
+
+  - You refresh the page and see you score in the column *TPR* 
+  - Details for report could be downloaded by clicking *Download output from scoring step*.
+  - Leader borad is updated in the `Results` tab.

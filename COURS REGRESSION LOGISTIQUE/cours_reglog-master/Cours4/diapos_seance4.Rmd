@@ -1,0 +1,487 @@
+---
+title: "Régression Logistique"
+subtitle: "Séance 4"
+author: "Florent Chuffart & Magali Richard (d'après le cours de Lydiane Agier)"
+date: "20 Novembre 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE, width = 75)
+knitr::opts_chunk$set(echo = TRUE, fig.align='center', dev='png', dpi = 95, out.width = "100%")
+```
+
+---
+
+## Evaluation
+
+ - individuelle sur un jeu de données aprés 2 séances de "Régression Logistique"
+ 
+ - data challenge à la fin des séances "Régression Logistique" et "Survie" (23 janvier 2019)
+
+## Pré-requis
+ 
+ - R https://cran.r-project.org 
+ - RStudio https://www.rstudio.com
+
+## Cours 
+
+- https://github.com/magrichard/cours_reglog
+
+---
+
+# Plan
+
+I) Rappel : Modèle, OR, RR et test de significativité
+II) Interprétation (et dangers!)
+III) Prédiction (et dangers!)
+IV) Introduction à la regression polytomique
+
+
+---
+
+## I) Rappel régression logistique : 
+
+### Principe
+
+Objectif : Modéliser une **variable binaire** en fonction d’une ou plusieurs autres covariables (quali ou quanti)
+$$Y \sim X$$
+$$E(Y|X) \sim X$$
+
+Par exemple, on cherche à connaitre la probabilité qu’un individu soit un homme sachant sa taille, son poids, ses habitudes alimentaires.
+
+### La fonction *logit*
+
+
+\begin{eqnarray}
+              \text{logit: } ]0,1[ & \rightarrow & \mathbb{R} \\
+                                 x & \rightarrow & logit(x)  =  log(\frac{x}{1-x}) \\ 
+logit^{-1}(y) = \frac{1}{1+e^{-y}} & \rightarrow & y
+\end{eqnarray}
+
+
+### La régression logistique
+
+Comme en régression linéaire, l’objet de cette modélisation est *d’estimer les coefficients $\beta$* :
+
+
+\begin{eqnarray}
+         logit(E(Y|X))    & = & \beta X             \\
+          logit(P(Y=1|X)) & = & \beta X             \\
+           logit(\pi(X)) & = & \beta X             \\
+                  \pi(X) & = & logit^{-1}(\beta X) 
+\end{eqnarray}
+
+On obtient ainsi $\pi(X)$, le prédicteur de Y en fonction de X.
+
+---
+
+##  I) Rappel regression logistique :
+
+ 
+### Les mesures d'interêt
+
+Comment interpréter $\widehat{\beta_k}$ ?  Quel est l‘effet de la variable $X_k$ sur $logit(P(Y=1|X))$ ?
+
+
+- *Définition*  **odds** 
+
+$$Odds(X) = \frac{\pi(X)}{1-\pi(X)} \iff Odds(X) = e^{\beta X}$$
+
+- *Définition*  **odds ratio** 
+
+$$ OR_{u/\nu} = \frac{odd(X = u)}{odd(X=\nu)} = e^{\beta (u-v)}$$
+ 
+ 
+- *Définition* **risque relatif** 
+
+$$ RR_{u/\nu} = \frac{\pi(X = u)}{\pi(X=\nu)} = \frac{P(Y=1|X=u)}{P(Y=1|X=\nu)} $$
+
+
+
+**$OR$ est directement calculable à partir des coefficients de la régression $\beta$**
+
+$OR$ estime le rapport malades/non-malades et $RR$ estime le risque (i.e. la probabilité) d’être malade.
+
+Ils donnent la même indication sur la relation entre $Y$ et $X$ :
+
+1) Si $RR_{u/\nu}$ (ou $OR_{u/\nu}$) $>1$ alors il y a plus de risque de $Y=1$ si $X=u$ que si $X=\nu$
+2) Si $RR_{u/\nu}$ (ou $OR_{u/\nu}$) $<1$ alors il y a moins de risque de $Y=1$ si $X=u$ que si $X=\nu$
+3) Si $RR_{u/\nu}$ (ou $OR_{u/\nu}$) $=1$ alors $Y$ n’est pas influencée par $X=u$ vs. $X=\nu$ (i.e. Y indépendant des catégories $u$ et $\nu$ de $X$)
+
+
+---
+
+##  I) Rappel regression logistique :
+
+### La significativité du paramêtre $\beta_k$
+
+On veut tester l’influence du facteur $X_k$. 
+
+$$\left\lbrace
+\begin{array}{l}
+H_0 : {\beta_k = 0} \\
+H_1 : {\beta_k \neq 0}
+\end{array}
+\right.$$
+
+Test de Wald pour un unique paramètre : $T = \Big(\frac {\widehat\beta_k} {\widehat\sigma_{\widehat\beta_k}}\Big)^2 \sim \mathcal{X}^2_1$
+
+### Comparaison de modèles emboités
+
+On veut tester si l’ajout de paramètres est pertinent.
+
+ - Soit $m_1$ un modèle emboité dans $m_2$ (*i.e.* toutes les variables de $m_1$ sont dans $m_2$)
+ - $m_2$ comprend $p$ variables explicatives supplémentaires par rapport à $m_1$
+ - $L_1$ est la valeur de vraisemblance de $m_1$
+ - $L_2$ est la valeur de vraisemblance de $m_2$
+ 
+Test du rapport de vraisemblance : $T = -2(log(L_1) - log(L_2)) \sim \mathcal{X}^2_p$
+
+---
+
+##  I) Rappel regression logistique :
+
+### Adéquation du modèle
+
+Comment mesurer si le modèle construit **prédit de façon efficace** les données observées ?
+
+Mesurer l’**adéquation** du modèle **aux données** c’est étudier essentiellement :
+
+- L’*écart global* entre les valeurs prédites et les valeurs observées (i.e. mesures globales)
+
+-- Calibration du modèle (concordance entre les valeurs prédites et observées) : **Test de Hosmer-Lemeshow**
+
+-- Pouvoir discriminant du modèle :  courbe **ROC** et critère **AUC** (Area Under Curve)
+
+### Sélection de variables
+
+- Critères de choix
+
+  -- Critère du $R^2$ 
+  
+  -- Critètre d’information d’Akaike (AIC)
+  
+  -- Critètre d’information bayesien (BIC)
+
+- Procédure de sélection de variable
+
+-- Forward (ou pas à pas ascendante)
+
+-- Backward (ou pas à pas descendante)
+
+-- Stepwise
+
+---
+
+# Plan
+
+I) Rappel : Modèle, OR, RR et test de significativité
+II) Interprétation (et dangers!)
+III) Prédiction (et dangers!)
+IV) Introduction à la regression polytomique
+
+
+
+---
+
+## II) Interprétation du modèle :
+### Les facteurs d'ajustement
+
+*Définition*: les facteurs d''ajustement sont des facteurs qui affectent l'association entre la variable observée et les variables explicatives et qui provoquent des erreurs dans l'interprétation des liens entre ces deux variables. Pour étudier correctement l’effet des covariables X sur la variable d’intérêt Y, il faut prendre en compte les facteurs d'ajustement.
+
+- Les facteurs **modifiant l’effet de X sur Y** (eg. le sexe pour certaines maladies)
+
+- Les facteurs **caractérisant la mesure** (eg. L’effet enqueteur, ou plaque pour des mesures biologiques…)
+
+- Les **facteurs de confusion** pour l’association entre X et Y
+
+La littérature aide à déterminer quels facteurs d’ajustement on doit retenir
+
+Rq: si on inclue trop de facteurs dans un modèle (i.e. >5-10% du nombre d’observations), on diminue la précision des estimateurs, qui peuvent devenir instables, imprécises et biaisées.
+
+---
+
+## II)  Interprétation du modèle :
+### Exemple des facteurs de confustion 
+
+*Définition*: $Z$ est un facteur de confusion si:
+
+- $Z$ (tabac) est une cause de $Y$ (maladie)
+
+- $Z$ (tabac) est associé à $X$ (café), mais n’est pas une conséquence de $X$ (café)
+
+Ne pas prendre un compte ce facteur $Z$ (tabac) peut créer un **biais d’association** entre $X$ (café) et $Y$(maladie)
+
+![](fig/Confounding_f.jpg)
+
+---
+
+## II) Interprétation du modèle :
+### Exemple des facteurs de confusion 
+
+En pratique, on retient $Z$ comme facteur de confusion si ces deux conditions sont remplies:
+
+- $Z$ est associé à $Y$ (i.e. p-valeur du test de Wald <0.1)
+
+- ajouter $Z$ au modèle modifie d’effet d’une covariable (changement du coefficient $\beta$ associé <10%)
+
+
+Rq: 
+
+- la notion de facteur de confusion dépend des variables prises en compte, elle n’est pas absolue
+
+- Il est aussi grave d’oublier un facteur de confusion que de prendre en compte un facteur qui n’est pas confondant.
+
+- Il est souvent difficile de déterminer les facteurs de confusion, qui restent «présumés».
+
+---
+
+## II) Interprétation du modèle :
+### Exemple des facteurs de confusion 
+
+
+```{r}
+d = read.table("data/data_nutri.csv", header=TRUE, sep=",", row.names = 1)
+d$sex = as.factor(d$sex)
+#DT::datatable(d, width = "100%")
+s = as.numeric(d$sex) - 1
+```
+
+(1) Calcul des OR en univarié
+
+```{r}
+m1_taille = glm(s~d$taille, family = binomial(logit))
+m1_taille$coefficients
+summary(m1_taille)$coefficient
+OR_mod1_taille = exp(summary(m1_taille)$coefficient[2,1])
+```
+
+
+```{r}
+m1_the = glm(s~d$the, family = binomial(logit))
+m1_the$coefficients
+summary(m1_the)$coefficient
+OR_mod1_the = exp(summary(m1_the)$coefficient[2,1])
+```
+
+(2) Calcul des OR en multivarié
+
+```{r}
+m2 = glm(s~d$taille + d$the, family = binomial(logit))
+m2$coefficients
+summary(m2)$coefficient
+OR_mod2_taille = exp(summary(m2)$coefficient[2,1])
+OR_mod2_the = exp(summary(m2)$coefficient[3,1])
+```
+
+```{r}
+OR_mod1_taille 
+OR_mod2_taille
+OR_mod1_the 
+OR_mod2_the
+```
+ 
+(3) Interprétation
+
+Si **différence** entre cas 1 et cas 2:
+
+   - Facteur de confusion (différence majeure)
+   
+   - Informations redondantes (corrélation ou colinéarité  si plus de deux facteurs)
+   
+Si **pas de différence** entre cas 1 et cas 2:
+
+   - X1 et X2 sont des facteurs indépendants et tenir compte de l'effet de X2 ne change rien sur l'effet de X1
+
+---
+
+## II) Interprétation du modèle :
+### Type de variable 
+
+On cible une variable d’intérêt, qu’on mesure par l’intermédiaire d’une variable aléatoire.
+
+On distingue:
+
+- La nature «réelle» de la variable d’intérêt
+
+- La nature de la variable aléatoire mesurée
+
+- Le codage de cette variable aléatoire
+
+Exemple: l’âge 
+
+Cette variable d’intérêt est de nature continue. Elle peut représenter synthétiquement beaucoup de notions complexes: le vieillissement biologique, l’exposition cumulée à des polluants, le risque de maladie spécifique à certaines tranches d’âges…
+
+La variable aléatoire âge est mesurée en jours/mois/années. 
+Théoriquement, c’est donc une variable discrète (i.e. nombre limité de valeurs possibles, eg. sur une population d’enfant avec âge en années), mais on le considère souvent comme de nature continue.
+
+On peut aussi le catégoriser/coder en tranches d’âges (ex. de codage: <35 ans, 35-45 ans, 45-55 ans, >55 ans) 
+
+---
+
+## II) Interprétation du modèle :
+### Encodage des variables
+
+#### Codage
+
+- Eviter de faire des hypothèses arbitraires sur la relation variable explicative- variable expliquée (chercher dans la littérature, par « bon sens» en lien avec nos à priori biologiques, par observation des données, tests, etc.)
+
+- Prendre en compte dans un modèle une variable mal codée peut s’avérer pire que de ne pas la prendre en compte 
+
+#### Transformation 
+
+- Toute variable peut être **transformée** avant de l’inclure dans un modèle, eg.
+Passée au logarithme, à l’exponentiel, catégorisée pour une variable continue
+Regrouper les catégories pour une variable catégorielle
+
+- Attention à bien définir la **catégorie de référence** pour les variables catégorielles
+
+---
+
+## II) Interprétation du modèle :
+### Causalité 
+
+**ATTENTION**
+
+Association n’est pas causalité!
+
+Les modèles mettent en lumière des associations, mais on ne sait pas lesquelles sont causales. 
+
+En santé par exemple, il faudrait comprendre le processus biologique pour conclure à une causalité.
+
+---
+
+## II) Interprétation du modèle :
+### Résumé
+
+Procédure communément utilisée de sélection de modèle:
+
+1) Effectuer une première sélection par des tests univariés (au risque de 0.05, 0.10 ou 0.20) surtout quand on a un grand nombre de variables d’ exposition
+
+2) A partir de cette première sélection, chercher le modèle multivarié approprié (plusieurs procédures pas a pas peuvent etre testées)
+
+3) Tester les interactions entre variables du modèle multivarié retenu
+
+4) Au final, ne retenir que les variables significatives simultanément. Retenir les effets principaux quand on retient une interaction.
+
+---
+
+# Plan
+
+I) Rappel : Modèle, OR, RR et test de significativité
+II) Interprétation (et dangers!)
+III) Prédiction (et dangers!)
+IV) Introduction à la regression polytomique
+
+
+---
+
+## III) Prédiction du modèle 
+
+Objectif de la modélisation est soit:
+
+- **Explicatif** : chercher la meilleure association de variables
+explicatives pour expliquer Y  -> *notion de parcimonie*
+
+- **Prédictif** : chercher la meilleure association de variables
+explicatives pour prédire Y -> *pas toujours parcimonieux*
+
+On distingue deux types de prédictions
+
+- La valeur prédite par le modèle pour l’individu $i$ est:
+
+$$logit(\pi(X)) = logit(\widehat P(Y_1 = 0 | X = x_i)) = \widehat \beta x_i$$
+- La probabilité estimée d’évènement $Y=1$ est:
+
+$$\pi(X) = logit^{-1}(\beta X)$$
+$$\widehat P(Y_1 = 0 | X = x_i)  = logit^{-1}(\beta X) = \frac{e^{\widehat\beta x_i}}{1 + e^{\widehat\beta x_i}} $$
+
+---
+
+## III) Prédiction du modèle 
+### Exemple d'application 
+
+Prediction de $logit(\pi(X)) =  \widehat \beta x_i$
+
+```{r}
+m= glm(s~taille+poids, d,family = binomial(logit))
+logit.pi.hat = predict(m,newdata = data.frame(taille = 168, poids = 75), se.fit = TRUE)
+logit.pi.hat$fit
+
+```
+
+Prediction de $\widehat \pi(X) =  \frac{e^{\widehat\beta x_i}}{1 + e^{\widehat\beta x_i}}$
+
+```{r}
+pi.hat = exp(logit.pi.hat$fit)/(1+exp(logit.pi.hat$fit))
+pi.hat.resp = predict.glm(m,newdata = data.frame(taille = 168, poids = 75), type = "response", se.fit = TRUE)
+pi.hat
+pi.hat.resp$fit
+```
+
+Predication de l'interval de confiance $IC_{95}(\widehat \pi(X))$
+
+```{r}
+ci = c(pi.hat.resp$fit - 1.96*pi.hat.resp$se.fit, pi.hat.resp$fit+ 1.96*pi.hat.resp$se.fit)
+exp(ci)/(1+exp(ci))
+```
+
+---
+
+# Plan
+
+I) Rappel : Modèle, OR, RR et test de significativité
+II) Interprétation (et dangers!)
+III) Prédiction (et dangers!)
+IV) Introduction à la regression polytomique
+
+---
+
+## IV) Introduction à la regression polytomique 
+
+Extension du modèle logistique à une variable expliquée **multinomiale** (au lieu de binomiale). Ce modèle est appelé **régression logistique polytomique** (à variable dépendante nominale) ou **régression logistique multinomiale**
+
+i.e.  $Y$ est qualitative nominale à $K (K > 2)$ modalités. 
+
+Il faut pour cela prendre une modalité de référence $u$ , et estimer $(K-1)$ logits, i.e. pour tout $k$ différent de $u$:
+
+
+$$ln \Big(\frac{P(Y=k|X)}{P(Y=u|X)}\Big) = \beta_kX $$
+
+Rq:
+
+- Il existe différentes manières de définir les logits
+
+- Les équations ( et donc les estimations) sont indépendantes pour chaque valeur de $k$
+
+- Les mêmes variables explicatives sont utilisées pour chacune des équations
+
+---
+
+## IV) Introduction à la regression polytomique 
+### Exemple
+
+```{r, eval = TRUE}
+table(d$poisson)
+d$s = s
+library(VGAM)
+m= vglm(poisson~s+poids, family = multinomial, data = d)
+summary(m)
+
+
+```
+
+$ln \Big(\frac{P(Y=k|X)}{P(Y=u|X)}\Big) = \beta_kX$ correspond aux prédicteurs linéaires:
+
+`log(mu[,1]/mu[,6]), log(mu[,2]/mu[,6]), log(mu[,3]/mu[,6]), log(mu[,4]/mu[,6]), log(mu[,5]/mu[,6])`
+
+---
+
+## Mise en pratique
+
+Quelques exercices à réaliser sous R disponibles:
+
+- [TP2](TP2_reglog_M2.pdf)
+
+- [TP3](TP3_reglog_M2.pdf)

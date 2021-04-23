@@ -1,0 +1,157 @@
+---
+title: "Submission script (histpred)"
+output: 
+  rmarkdown::html_document
+---
+
+Please use the `submission_script_histology.Rmd` contained in the `starting_kit` folder as a template to write, run and save your code.
+
+## Prediction of the patient histology
+
+```{r echo=TRUE, results="verbnatim", label="generate_zip_file"}
+### DO NOT CHANGE THIS PART
+d <- readRDS("data_learn.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    d[[ v ]] <- as.factor(x = d[[ v ]])
+}
+#summary(object = d)
+
+test <- readRDS("data_test_histology.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    test[[ v ]] <- as.factor(x = test[[ v ]])
+}
+#summary(object = test)
+
+## PUT YOUR SCRIPT HERE
+model <- glm(
+    formula = histology ~ age + sex 
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+```
+Avec ce premier modèle du script on remarque que le sexe  Masculin explique beaucoup plus l'hystologie alors que l'âge n'intervient pas.
+On obtient avec ce modèle comme valeurs prédites, 34 pour TCGA-LUAD et 66 pour TCGA-LUSC.
+
+Je fais donc un autre modèle en retirant l'âge et en y ajoutant d'autres variables sans les gènes.
+
+```{r}
+model <- glm(
+    formula = histology ~ sex + t + age + n + m + tnm_stage
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+
+```
+Avec ce modèle, je constate que seuls le sexe (sexM) et la variable m (mMX) sont très significatifs.Avec ce modèle,
+on prédit comme valeurs 49 pour TCGA-LUAD et 51 pour TCGA-LUSC
+
+De cela, j'ai pensé qu'il serait intéressant de faire un modèle en conservant le sexe et la variable m tout en y incluant les gènes.
+Pour se faire, dans un premier temps, je fais un modèle en fonction en fonction de chaque gène tout en retenant les 15 plus petits p-values (c'est à dire les 20 premiers les plus significatifs).
+
+```{r}
+
+gs = names(d)[13:1012]
+p_values = rep(NA, length(gs))
+names(p_values) <- gs
+
+for (i in 1:length(gs)) {
+  model <- glm(
+    formula = histology ~ d[, gs[i]],
+    data = d,
+    family = binomial(link = 'logit')
+  )
+  
+  coeffs = summary(model)$coefficient
+  if (nrow(coeffs) != 1) {
+    p_values[i] = summary(model)$coefficient[2, 4]
+  }
+}
+
+p_values_min = head(sort(p_values), n = 15)
+genes_selected = paste(names(p_values_min), collapse = "+", sep = "")
+form = paste("histology ~", genes_selected)
+
+model <- glm(
+  formula = as.formula(form),
+  data = d,
+  family = binomial(link = 'logit')
+)
+step(model, dir = "backward")
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+```
+Avec ce moèle, les valeurs prédites sont 51 pour TCGA-LUAD et 49 pour TCGA-LUSC.
+
+Dans un second temps, je fais un modèle en fonction de ces gènes et des variables sex et m.
+
+```{r }
+#######################
+
+#a<-eval(parse(text="genes_selected")) pour enlever les guillemets? et mettre sex+ m+ genes_selected
+model <- glm(
+    formula = histology ~ sex + m + LINC02428+DLX6+SPDEF+SERPINB2+KRT42P+LINC01503+SMO+MCM2+TMEM189+CDHR1+FBL+SNCA+SERPINB5+KPNA1
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+
+### DO NOT CHANGE THIS PART
+saveRDS(pred, "results.rds")
+zip_filename <- paste0(
+    "results_"
+  , format(x = Sys.time( ), format = "%Y_%m_%d_-_%s")
+  , ".zip"
+)
+if ( !{ "zip" %in% installed.packages( ) } ) {
+    install.packages(pkgs = "zip")
+}
+zip::zip(zip_filename, "results.rds")
+print(zip_filename)
+```
+Avec ce modèle,on prédit comme valeurs 50 pour TCGA-LUAD et 50 pour TCGA-LUSC.
+
+
+## Submit zip file
+
+It generates *`r zip_filename`* submission file.
+
+Submit the zip submission file in the `Participate` tab of the codalab challenge by clicking the `Submit` button.
+
+The metric used to evaluate prediction is the true positive rate (TPR) coded with the provided `scoring_function()`.
+
+On the codalab challenge web page, The *STATUS* become : 
+
+  - Submitting
+  - Submitted	
+  - Running
+  - Finished
+
+When itâ€™s finished: 
+
+  - You refresh the page and see you score in the column *TPR* 
+  - Details for report could be downloaded by clicking *Download output from scoring step*.
+  - Leader borad is updated in the `Results` tab.

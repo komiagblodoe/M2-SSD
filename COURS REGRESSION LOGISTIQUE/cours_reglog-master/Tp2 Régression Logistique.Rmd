@@ -1,0 +1,87 @@
+---
+title: "TP2 Reg Logistique"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "10 décembre 2019"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+
+```{r}
+d<-read.csv("C:/Users/im2ag/Desktop/COURS REGRESSION LOGISTIQUE/cours_reglog-master/data/dataLogReg.csv",row.names=1)
+
+head(d)
+```
+
+```{r}
+sum(is.na(d))
+
+for ( v in c("Montagnard", "Travailler", "Habiter", "Altitude") ) {
+    d[[ v ]] <- as.factor(x = d[[ v ]])
+}
+
+
+ formula = Montagnard ~ Travailler + Altitude
+
+```
+
+$$logit(E(Y|X_1,X_2))=\beta_0+\beta_1 X_1 +\beta_2 X_2 + \epsilon$$
+Avec Y= Montagnard, $X_1=Travailler$ et $X_2=Altitude$
+
+
+
+2 
+
+```{r}
+
+dim(d)
+
+model <- glm(
+    formula = Montagnard ~ Travailler + Altitude
+  , data = d
+  , family = binomial
+)
+summary(object = model)
+
+#summary(model)$coefficients
+```
+La taille de la population est de 4392.
+D'après la sortie les variables  st significatives 
+
+
+Etudier l'association avec la variable Travailler
+
+
+
+3. On regarde la variable cat´egorielle Travailler. Proposez un graphique de la distribution de cette variable.
+
+```{r}
+library(ggplot2)
+
+ggplot(d)+   
+  geom_bar(aes(x=Montagnard,fill=Montagnard))+ 
+  facet_wrap(.~Travailler)
+
+barplot(table(d$Travailler))
+
+```
+
+
+4
+
+```{r}
+#utiliser les formules du cours pour le calcul des odd ratio
+
+OR_1_0<-exp(summary(model)$coefficient[2,1])
+
+OR_2_1<-exp(summary(model)$coefficient[2,1])
+  
+OR_2_0<-exp(summary(model)$coefficient[3,1]*2)      
+
+```
+
+

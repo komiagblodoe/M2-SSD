@@ -1,0 +1,452 @@
+---
+title: "Régression Logistique"
+subtitle: "Séance 2"
+author: "Florent Chuffart & Magali Richard (d'après le cours de Lydiane Agier)"
+date: "20 Novembre 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE, width = 75)
+knitr::opts_chunk$set(echo = TRUE, fig.align='center', dev='png', dpi = 95, out.width = "100%")
+```
+
+---
+
+## Evaluation
+
+ - individuelle sur un jeu de données aprés 2 séances de "Régression Logistique"
+ 
+ - data challenge à la fin des séances "Régression Logistique" et "Survie" (23 janvier 2019)
+
+## Pré-requis
+ 
+ - R https://cran.r-project.org 
+ - RStudio https://www.rstudio.com
+
+## Cours 
+
+- https://github.com/magrichard/cours_reglog
+
+---
+
+# Plan
+
+I) Rappel (régression logistique)
+II) Odds ratio et Risk ratio
+III) Test de significativité
+
+
+---
+
+## I) Rappel régression logistique: principe
+
+Objectif : Modéliser une **variable binaire** en fonction d’une ou plusieurs autres covariables (quali ou quanti)
+$$Y \sim X$$
+$$E(Y|X) \sim X$$
+
+Exemple de variable à expliquer : 
+  
+  - Le sexe en fonction du poids
+  - Maladie coronarienne en fonction d’HTA et cholestérol
+  - Survenue de cancer en fonction d’expositions chimiques
+  - Consommation d’un bien selon variables sociodémographiques
+  - Risque d’accoucher d’un bébé de faible poids (<2500g) en fonction de l’âge de la mère, du poids, du tabagisme.
+
+
+---
+
+## I) Données : data_nutri
+
+```{r}
+d = read.table("data/data_nutri.csv", header=TRUE, sep=",", row.names = 1)
+d$sex = as.factor(d$sex)
+DT::datatable(d, width = "100%")
+# head(d)
+```
+
+---
+
+## I) Rappel regression linéaire : exemple sex ~ poids
+
+Y est expliquée (modélisée) par  les variables explicatives $X= (X_1,X_2,...,X_p)$.
+
+Si $p=1$, c’est une fonction affine de X.
+
+Modèle : $$E(Y)  = \beta X= \beta_0 + \beta_1X_1 + … + \beta_pX_p$$
+
+avec $\beta=(\beta_0, \beta_1, …, \beta_p)$ estimé par les moindres carrées 
+
+---
+
+## I) Rappel regression linéaire : exemple sex ~ poids
+
+
+
+```{r}
+# README RStudio config, uncheck: # preferences > R Markdown > show output inline for...
+layout(matrix(1:2, 1), respect=TRUE)
+s = as.numeric(d$sex) - 1
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+## Model
+# Y~X
+# E(Y) = b.X
+# E(Y) = b_0 + b_1.X
+# Y_i = b_0 + b_1.X_i + e_i
+m = lm(s~d$poids)
+m$coefficients
+abline(a=m$coefficients[[1]], b=m$coefficients[[2]], col=2, lwd=2) # /!\ y = b.x + a
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# residuals
+arrows(d$poids, s, d$poids, s-m$residuals, col=adjustcolor(4, alpha.f=0.2), length=0.1, lwd=2)
+legend("bottomright",c("regression line", "residuals"), col=c(2,4), lty=1, cex=0.6)
+
+```
+
+
+
+---
+
+## I) Rappel regression logistique : le modèle logistique
+
+On utilise le modèle logistique:
+$$	x	\rightarrow	logit(x) = log(\frac{x}{1-x}) $$
+    $$logit(E(Y|X)) = \beta X$$
+    $$logit(P(Y=1|X))= \beta X$$ 
+    $$logit(\pi (X))= \beta X$$ 
+    $$\pi (X)= logit^{-1}(\beta X)$$ 
+
+Comme en régression linéaire, l’objet de cette modélisation est *d’estimer les coefficients $\beta$*
+
+---
+
+## I) Rappel regression logistique: exemple sex ~ poids
+
+
+```{r}
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d$poids):max(d$poids)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+py1x = function(t,m) {
+  x = m$coefficients[[1]] + m$coefficients[[2]]*t
+  1/(1 + exp(-x))
+}
+arrows(d$poids, s, d$poids, py1x(d$poids,m), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright","1 - lP(Y|X)", col=4, lty=1, cex=0.6)
+```
+
+---
+
+## I) Rappel regression logistique : estimation
+
+- Le modèle s’écrit:  $logit(E(Y|X_1,...,X_p)) = \beta_0 + \beta_1X_1+...+\beta_pX_p$
+
+Les paramètres $\beta = (\beta_0,\beta_1, ..., \beta_p)$ sont inconnus
+
+- On estime $\beta$ par **maximum de vraisemblance** : $\widehat{\beta}_n = argmax L_n(\beta)$
+
+- L’estimation de  $\widehat{\beta}$  est donc faite **par approximation**. Sa valeur **dépend du modèle utilisé et de la validité de celui-ci**.
+
+- On en déduit les **intervalles de confiance** pour $\beta_k$: $$ IC(\widehat{\beta}) = \Big[\widehat{\beta_k} -t_{1-\alpha/2,n-2} * \sqrt{\widehat{var}(\widehat{\beta_k})} ; \widehat{\beta_k}+t_{1-\alpha/2,n-2} * \sqrt{\widehat{var}(\widehat{\beta_k})} \Big]$$
+
+- A partir de $\widehat{\beta}$ , on peut calculer:
+
+1) les **valeurs prédites** : $\pi(X)$ 
+2) les **résidus** : $\epsilon = Y - \widehat{\pi}(X)$
+
+---
+
+## II) Mesures d'interet : RR et OR
+
+**Comment interpréter $\widehat{\beta_k}$ ?**
+
+En d'autres mots: quel est l'effet de la variable $X_k$ sur $logit(P(Y=1|X))$
+
+ $logit(\pi(X))=\beta X \iff log \Big(\frac{\pi(X)}{1-\pi(X)}\Big) =\beta X$
+
+On defini $Odds(X) = \frac{\pi(X)}{1-\pi(X)} \iff Odds(X) = e^{(\beta X)}$
+
+*Exemple* : si un étudiant a 3 chances sur 4 d’être reçu, contre 1 chance sur 4 d’être collé, sa cote est de « 3 contre 1 », soit $Odds=\frac{3/4}{1/4}=3$
+
+- On va pouvoir calculer 2 mesures d’interêt pour l’effet de $X_k$ sur $Y$:
+ le **risque relatif (RR)** et l’**odds ratio (OR)**
+
+---
+
+# Exemple
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d$poids):max(d$poids)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+py1x = function(t,m) {
+ x = m$coefficients[[1]] + m$coefficients[[2]]*t
+ 1/(1 + exp(-x))
+}
+arrows(d$poids, s, d$poids, py1x(d$poids,m), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright","P(Y|X)", col=4, lty=1, cex=0.6)
+
+
+x = min(d$poids):max(d$poids)
+plot(x,log(logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x) / (1-logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x))), ylab="logit(poids)", xlab="poids", main="logit(poids)=b.poids")
+plot(x,logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x) / (1-logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x)), ylab="pi(poids) / (1-pi(poids))", xlab="poids", main="Odd(poids)")
+plot(x,exp(m$coefficients[[1]] + m$coefficients[[2]]*x), ylab="exp(b.poids)", xlab="poids", main="Odd(poids)")
+abline(v=72, h=exp(m$coefficients[[1]] + m$coefficients[[2]]*72), col=2)
+
+x = 72
+exp(m$coefficients[[1]] + m$coefficients[[2]]*72)
+```
+---
+
+
+
+
+
+
+
+
+
+
+
+##  II) Risque relatif ou risk ratio (RR)
+
+- *Définition* : On définit le **risque relatif** par 
+
+$$ RR_{u/\nu} = \frac{\pi(X = u)}{\pi(X=\nu)} = \frac{P(Y=1|X=u)}{P(Y=1|X=\nu)} $$
+
+/!\ $X$ (et donc $u$ et $\nu$) peut etre de dimension >1, i.e. définir plus d’une caractéristique
+
+- *Interprétation* : le risque d’évènement $Y=1$ est $RR$ fois plus grand chez les individus pour lesquels $X=u$ (pop1) par rapport à ceux pour lesquels $X=\nu$ (pop2).
+1) Si $RR>1$ => il y a plus de risque de Y=1 chez pop1 que chez pop2
+2) Si $RR<1$ => il y a moins de risque de Y=1 chez pop1 que chez pop2
+3) Si $RR=1$ => il y a autant de risque de Y=1 chez pop1 que chez pop2
+
+---
+
+##  II) Odds ratio (OR)
+
+- *Définition* : On définit le **odds ratio** par 
+
+$$ OR_{u/\nu} = \frac{odd(X = u)}{odd(X=\nu)} $$
+
+/!\ $X$ (et donc $u$ et $\nu$) peut etre de dimension >1, i.e. définir plus d’une caractéristique
+
+- *Interprétation* : il y a $OR$ fois plus d’évènements $Y=1$ que d’évènements $Y=0$ chez les individus pour lesquels $X=u$ (pop1) par rapport à ceux pour lesquels $X=\nu$ (pop2).
+1) Si $OR>1$ => il y a plus de risque de $Y=1$ chez pop1 que chez pop2
+2) Si $OR<1$ => il y a moins de risque de $Y=1$ chez pop1 que chez pop2
+3) Si $OR=1$ => il y a autant de risque de $Y=1$ chez pop1 que chez pop2
+
+---
+
+## II) Exemple Odds Ratio
+
+**!! RR n’est pas directement calculable**
+
+-> Pour une variable $X_1$ binaire
+
+Avec $logit(E(Y|X_1)) = \beta X = \beta_0 + \beta_1X_1$
+
+$$ OR_{1/0} = \frac{Odd(X_1=1)}{Odd(X_1=0)} = \frac{e^{(\widehat\beta_0 + \widehat\beta_1)}}{e^{(\widehat\beta_0)}} = e^{(\widehat\beta_1)} $$
+-> Pour une variable $X_1$ quantitative:
+
+L’estimateur de $β_1$: permet d’avoir l’odds ratio quand $X_1$ augmente d’une unité
+
+$$ OR = e^{(\widehat\beta_1)} $$
+
+```{r}
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m$coefficients
+summary(m)$coefficient
+```
+
+```{r}
+#Coefficient for weight effect
+summary(m)$coefficient[2,1]
+```
+
+```{r}
+#IC
+confint.default(m)
+```
+ 
+
+```{r}
+#Odds ratio for weight effect
+exp(summary(m)$coefficient[2,1])
+
+#Odds ratio for size effect
+exp(summary(m)$coefficient[3,1])
+
+#Odds ratio for age effect
+exp(summary(m)$coefficient[4,1])
+```
+
+---
+
+##  II) Quelle mesure choisir?
+
+- $OR$ estime le rapport malades/non-malades.
+
+- $RR$ estime le risque (i.e. la probabilité) d’être malade.
+
+- Ils donnent la même indication sur la relation entre $Y$ et $X$:
+1) Si $RR_{u/\nu}>1$ / $OR_{u/\nu}>1$ => il y a plus de risque de $Y=1$ si $X=u$ que si $X=\nu$
+2) Si $RR_{u/\nu}<1$ / $OR_{u/\nu}<1$ => il y a moins de risque de $Y=1$ si $X=u$ que si $X=\nu$
+3) Si $RR_{u/\nu}=1$ / $OR_{u/\nu}=1$ => $Y$ n’est pas influencée par $X=u$ vs. $X=\nu$ (i.e. Y indépendant des catégories $u$ et $\nu$ de $X$)
+
+- $RR$ est plus sensible (aux arrondis numériques notamment)
+
+- Si l’évènement est rare, $OR>>RR$
+
+- **$OR$ directement calculable à partir des coefficients de régression $\beta$**
+
+---
+
+## III) Test de significativité des paramètres 
+
+- On veut tester l’influence de $X_k$. On teste: $$H_0 : {\beta_k = 0}$$	vs. $$H_1 : {\beta_k \neq 0}$$
+
+- Il existe 3 tests:
+1) Test de Wald
+2) Test du score (peu utilisé, pas vu ici)
+3) Test du rapport de vraisemblance (pour modèles emboités)
+
+---
+
+## III) Test de Wald 
+
+$$ \sqrt{n\Sigma^{1/2}}(\widehat{\beta}-\beta) \rightarrow \mathcal{N}(0,I_p) $$
+$$ T =n(\widehat\beta-\beta)'\widehat\Sigma^{-1}(\widehat\beta-\beta) \xrightarrow[]{L} \mathcal{X}^2_p $$
+avec $n$ le nombre d'observations et $p$ le nombre de paramètres testés.
+
+Rq, pour un unique paramètre on a $T = \Big(\frac {\widehat\beta_k} {\widehat\sigma_{\widehat\beta_k}}\Big)^2 \sim \mathcal{X}^2_p$
+
+- On rejette $H_0$ si: 
+$$T>z^p_{1-\alpha}$$
+avec $z^p_{1-\alpha}$ le quantile de niveau $(1-\alpha)$ de la loi de $\mathcal{X}^2$ à $p$ ddl.
+
+---
+
+## III) Exemple Test de Wald
+
+```{r}
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m$coefficients
+summary(m)$coefficient
+```
+
+```{r}
+#Wald test for weight effect
+summary(m)$coefficient[2,4]
+#Wald test for size effect
+summary(m)$coefficient[3,4]
+#Wald test for age effect
+summary(m)$coefficient[4,4]
+```
+
+```{r, eval=FALSE}
+library(aod)
+varEst = summary(m1)$cov.unscaled
+Est = summary(m1)$coefficient[,1]
+Est
+#wald test for age
+wald.test(Sigma = varEst, b = Est , Terms = 4)
+```
+
+---
+
+## III) Test du rapport de vraisemblance
+
+Soit mod1 un modèle emboité dans mod2 (i.e. toutes les variables dans mod1 sont dans mod2) avec mod2 qui comprend $p$ variables explicatives supplémentaires par rapport à mod1 avec:
+
+$L1$ la valeur de vraisemblance de mod1 et $L2$ la valeur de vraisemblance de mod2. On a:
+
+$$ T = -2[log(L_1) - log(L_2)] \rightarrow \mathcal{X}^2_p$$
+Rq: On appelle $D= - 2 log(L1))$ la déviance pour mod1
+
+*!! Il faut que ces modèles soient appliquées aux même observations (entre autres, pas de données manquantes)*
+
+- On rejette $H_0$ si: 
+$$T>z^p_{1-\alpha}$$
+avec $z^p_{1-\alpha}$ le quantile de niveau $(1-\alpha)$ de la loi de $\mathcal{X}^2$ à $p$ ddl.
+
+*!! Il faut que l’ajout des $p$ variables apportent suffisamment au modèle pour être considérées «utiles»*
+
+---
+
+## III) Exemple Test du rapport de vraisemblance
+
+$H_0 : {\beta_{age} = 0}$	vs. $H_1 : {\beta_{age} \neq 0}$
+
+```{r}
+m1 = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m2 = glm(s~d$poids+d$taille, family = binomial(logit))
+anova(m2, m1, test="Chisq")
+```
+
+$H_0 : {(\beta_{poids}, \beta_{age}) = (0,0)}$	vs. $H_1 :{(\beta_{poids}, \beta_{age}) \neq (0,0)}$
+
+```{r}
+m1 = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m2 = glm(s~d$taille, family = binomial(logit))
+anova(m2, m1, test="Chisq")
+```
+
+```{r, eval=FALSE}
+library(aod)
+varEst = summary(m1)$cov.unscaled
+Est = summary(m1)$coefficient[,1]
+Est
+#wald test for age
+wald.test(Sigma = varEst, b = Est , Terms = c(1,3)
+```
+---
+
+##  III) Comment utiliser les tests de significativité?
+
+- Ces tests peuvent  être utilisés pour **comparer des modèles**, et décider s’il faut ou non inclure une variable dans notre modèle explicatif de Y.
+
+- Ils sont aussi utiles pour **tester une variable catégorielle** en testant conjointement toutes ses catégories 
+
+Rappels sur les tests
+
+![](fig/test.png)
+
+- Souvent dans les tests, on cherche à contrôler le risque de type 1, au niveau $\alpha$.
+
+Si on a p-valeur du test=4%, c’est que si $H_0$ est vrai, et qu’on répétait la simulation 100 fois, on aurait obtenu 4 fois une valeur de statistique de test égale ou plus extrême que celle observée.
+
+---
+
+## Evaluation
+
+### Sujet
+
+On s'intéresse à la méthylation de l'ADN sur différents tissus humains (187 échantillons). Pour certains échantillons, le genre est manquant. Utilisez les valeurs de méthylation pour **imputer le sexe** des échantillons lorsqu'il n'est pas connu.
+
+Veuillez restituer votre travail sous le format d'un PDF de deux pages (graphiques compris) en décrivant la méthode que vous avez choisie, en expliquant les choix que vous avez effectués et en analysant vos résultats. 
+
+Ce travail est à renvoyer par e-mail avant le *mardi 27 novembre 2018 (minuit)* à :
+
+- magali.richard@univ-grenoble-alpes.fr & florent.chuffart@univ-grenoble-alpes.fr 
+
+ Le sujet (avec les données et un exemple) est disponible [ici](sujet_controle_continu.pdf)
+ 
+---
+
+## Mise en pratique
+
+Quelques exercices à réaliser sous R disponibles [ici](TD.pdf)
+

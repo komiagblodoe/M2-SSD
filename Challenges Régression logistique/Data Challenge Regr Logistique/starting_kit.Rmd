@@ -1,0 +1,170 @@
+---
+title: "Sex Prediction Challenge (sexpred)"
+subtitle: "Starting kit"
+author: "Florent Chuffart & Magali Richard"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: false
+---
+
+```{r label="header", echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+```
+
+# I. Overview
+
+```{r child='overview.Rmd'}
+```
+
+Lecture des données data_learn
+
+```{r}
+d=readRDS("data_learn.rds")
+
+head(d[,1:15])
+
+table(d$sex,useNA = "ifany")
+table(d$histology,useNA = "ifany")
+table(d$sex,d$histology,useNA = "ifany")
+table(d$tissue_status,useNA = "ifany")
+
+
+#define sex as 0 or 1
+
+s=as.numeric(d$sex=="M")
+
+#Get gene names
+
+gs=colnames(d)[13:1012]
+g=gs[1]
+
+layout(matrix(1:2, 1), respect = TRUE)
+plot(d[[g]],s, main="sex~gene", xlab="gene", ylab="sex")
+
+#P(Y=1|X)=logitinv(a+b.x)
+
+m=glm(s~d[[g]], family=binomial(logit))
+summary(m)$coefficients
+#pv=summary(m)$coefficients[2,5]
+
+logitinv=function(x) 1/(1+exp(-x))
+x=min(d[[g]]):max(d[[g]])
+lines(x,logitinv(m$coefficients[[1]]+m$coefficients[[2]]*x),col=2, lwd=2)
+legend("bottomright","logit(Y)=b.x",col=2,lty=1,cex=0.6)
+
+plot(d[[g]],s,main="sex~gene", xlab="gene", ylab="sex")
+
+py1x=function(t,m){
+  x=m$coefficients[[1]]+m$coefficients[[2]]*t
+  1/(1+exp(-x))
+}
+
+arrows(d[[g]],s,d[[g]],py1x(d[[g]],m),
+       col=adjustcolor(4,alpha.f=0.2),length=0.05,lwd=2)
+legend("bottomright","1-P(Y|X",col=4,lty=1,cex=0.6)
+
+#Fonction pour la pvaleur 
+
+pvs=sapply(gs, function(g){
+  print(g)
+  m=
+    glm(c(s,0,0,1,1)~c(d[[g]],0,max(d[,gs]),0max(d[,gs])
+    ), family = binomial(logit))
+  pv=summary(m)$coefficients[2,4]
+  pv
+})
+
+
+
+```
+
+# II. How to participate?
+
+## Where to go? 
+
+The challenge is hosted on the codalab platform: https://competitions.codalab.org/
+
+To participate, you need to:
+
+1- create an acount on the codalab platform
+
+2- subscribe to the *sexpred* challenge
+
+3- constitute teams (up to 4 people) and design a team coordinator on the platform
+
+## How to start?
+
+```{r child='evaluation.Rmd'}
+```
+
+# III. Submission (example)
+
+```{r child='submission_script_sex.Rmd'}
+```
+```{r}
+```
+
+# IV. Report / Evaluation
+
+## Report
+
+The goal will be to predict the sex of patients in a gene expression dataset. 
+
+You will use the codalab platform to evaluate your methods. 
+
+The challenge will be open for a week on the platform.
+You will work in teams of 3 or 4.
+
+You will report by team. 
+This report should consist of 3 parts, with:
+
+**A) Statistical methods used**
+
+*For instance* :
+
+- Descriptive statistics (actors, number of NA, pretreatment...)
+- Methods: Which function for linear model? (*e.g* lm, aov, rlm, glm, other...), Which model are your main models? ...
+
+**B) Critical evaluation of the progression of the score**
+
+*For instance* :
+For critical variation in your leader board score:
+
+- Evaluation of your model (e.g. number of parameters...)
+- What is your score on codalab?
+    
+**C) Discussion and biological interpretation**
+
+*For instance* :
+
+- Pros and cons each method
+- Biological meaning (gene expression correlations, tissues status...)
+
+## Evaluation
+
+You will be evaluated on the report you provide (hability to clearly explain your approach, the methods used and the evolution of your prediction score), the codalab leader board score **WILL NOT** be used as a metric to evaluate your score. 
+
+# V. References 
+
+[NCBI/GENE] https://www.ncbi.nlm.nih.gov/gene
+
+[TCGA] Data are coming from the TCGA (The cancer genome atlas). 
+They were extracted from several cohorts of patients. 
+Here are TCGA Study Abbreviations corresponding to each cancer. 
+https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tcga-study-abbreviations
+
+[Codalab] https://competitions.codalab.org
+
+[R] https://cran.r-project.org
+
+[RStudio] https://www.rstudio.com
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```

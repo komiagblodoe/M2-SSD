@@ -1,0 +1,81 @@
+---
+title: "Histology Prediction Challenge (histpred)"
+subtitle: "Starting kit"
+author: "Florent Chuffart & Magali Richard"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: false
+---
+
+```{r label="header", echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=FALSE, results="hide")
+```
+
+# I. Overview
+
+```{r child='overview.Rmd'}
+```
+
+# II. How to participate?
+
+## Where to go? 
+
+The challenge is hosted on the codalab platform: https://competitions.codalab.org/
+
+To participate, you need to:
+
+1- create an acount on the codalab platform
+
+2- subscribe to the *histpred* challenge
+
+
+## How to start?
+
+```{r child='evaluation.Rmd'}
+```
+
+# III. Submission (example)
+
+```{r child='submission_script_histology.Rmd'}
+```
+
+# IV. Report / Evaluation
+
+## Report
+
+The goal will be to predict the histology of patients using gene expression dataset and clinical data. 
+
+You will use the codalab platform to evaluate your methods. 
+
+You will report your work in a html file (compiled using a .rmd file). Provide an URL containing your work in this [form](https://forms.gle/DrEg1b9pkhbe6jYf6).
+
+Your report is due before December Tuesday 3rd.
+
+## Evaluation
+
+You will be evaluated on the report you provide (hability to clearly explain your approach, the methods used and the evolution of your prediction score), the codalab leader board score **WILL NOT** be used as a metric to evaluate your score. 
+
+# V. References 
+
+[NCBI/GENE] https://www.ncbi.nlm.nih.gov/gene
+
+[TCGA] Data are coming from the TCGA (The cancer genome atlas). 
+They were extracted from several cohorts of patients. 
+Here are TCGA Study Abbreviations corresponding to each cancer. 
+https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tcga-study-abbreviations
+
+[Codalab] https://competitions.codalab.org
+
+[R] https://cran.r-project.org
+
+[RStudio] https://www.rstudio.com
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```

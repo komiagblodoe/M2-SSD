@@ -1,0 +1,270 @@
+---
+title: "Challenge1"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "18 novembre 2019"
+output: html_document
+---
+
+Please use the `submission_script_sex.Rmd` contained in the `starting_kit` folder as a template to write, run and save your code.
+
+## Prediction of the patient sex
+
+```{r echo=TRUE, results="verbnatim", label="generate_zip_file"}
+### DO NOT CHANGE THIS PART
+d <- readRDS("data_learn.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    d[[ v ]] <- as.factor(x = d[[ v ]])
+}
+summary(object = d)
+
+test <- readRDS("data_test_sex.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    test[[ v ]] <- as.factor(x = test[[ v ]])
+}
+head(d)
+summary(object = test)
+```
+
+
+## PUT YOUR SCRIPT HERE
+
+```{r}
+model <- glm(
+    formula = sex ~ age + histology + dead + dead_at_24_months + t + n + m + tnm_stage
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$sex)[ 1 ]
+pred[ !idx ] <- levels(x = d$sex)[ 2 ]
+table(pred, useNA = "ifany")
+```
+
+# Avec le modèle précédent nous remarquons que les variables "histologyTCGA-LUSC"","tT2a","tT2b" sont significatives.
+
+#Je procède donc à une prédiction en fonction de l'histologie et la variable t 
+
+# Mon script
+
+```{r}
+gs = colnames(d)[13:1012]
+
+model1 <- glm(
+    formula = sex ~ histology + t 
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model1, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$sex)[ 1 ]
+pred[ !idx ] <- levels(x = d$sex)[ 2 ]
+table(pred, useNA = "ifany")
+```
+
+
+#Ensuite, pour regarder l'influence des gènes sur le sexe, je procède à une sélection de variables en regardant les pvaleurs.
+#sur les gènes afin d'en dégager celui qui est le plus expressif du sexe
+
+```{r}
+d = readRDS("data_learn.rds")
+head(d[,1:19])
+table(d$sex, useNA="ifany")
+table(d$histology, useNA="ifany")
+table(d$sex,d$histology, useNA="ifany")
+table(d$tissue_status, useNA="ifany")
+
+
+
+# definme sex as 0 or 1 
+s = as.numeric(d$sex == "M")
+s
+
+# get gene names
+gs = colnames(d)[13:1012]
+g = gs[1]
+d[[g]]
+g = "ATP10B"
+```
+  
+
+
+```{r}
+layout(matrix(1:2, 1), respect = TRUE)
+plot(d[[g]],s, main="sex~gene", xlab="gene", ylab="sex")
+
+#P(Y=1|X)=logitinv(a+b.x)
+
+m=glm(s~d[[g]], family=binomial(logit))
+summary(m)$coefficients
+#pv=summary(m)$coefficients[2,5]
+
+logitinv=function(x) 1/(1+exp(-x))
+x=min(d[[g]]):max(d[[g]])
+lines(x,logitinv(m$coefficients[[1]]+m$coefficients[[2]]*x),col=2, lwd=2)
+legend("bottomright","logit(Y)=b.x",col=2,lty=1,cex=0.6)
+
+plot(d[[g]],s,main="sex~gene", xlab="gene", ylab="sex")
+
+py1x=function(t,m){
+  x=m$coefficients[[1]]+m$coefficients[[2]]*t
+  1/(1+exp(-x))
+}
+
+arrows(d[[g]],s,d[[g]],py1x(d[[g]],m),
+       col=adjustcolor(4,alpha.f=0.2),length=0.05,lwd=2)
+legend("bottomright","1-P(Y|X",col=4,lty=1,cex=0.6)
+
+#Fonction pour la pvaleur 
+
+pvs=sapply(gs, function(g){
+  print(g)
+  m=
+    glm(c(s,0,0,1,1)~c(d[[g]],0,max(d[,gs]),0max(d[,gs])
+    ), family = binomial(logit))
+  pv=summary(m)$coefficients[2,4]
+  pv
+})
+```
+
+
+# Ici(Script du premier cours), je recherche le gène le plus expressif du sexe pour
+#ensuite faire un modèle en fonction de ce gène.
+
+```{r}
+
+d = readRDS("data_learn.rds")
+head(d[,1:19])
+table(d$sex, useNA="ifany")
+table(d$histology, useNA="ifany")
+table(d$sex,d$histology, useNA="ifany")
+table(d$tissue_status, useNA="ifany")
+
+
+
+# definme sex as 0 or 1 
+s = as.numeric(d$sex == "M")
+s
+
+# get gene names
+gs = colnames(d)[13:1012]
+g = gs[1]
+d[[g]]
+g = "ATP10B"
+
+
+
+head(gs,2)
+layout(matrix(1:2, 1), respect=TRUE)
+boxplot(d[[g]]~s)
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d[[g]], family = binomial(logit))
+summary(m)$coefficients
+pv = summary(m)$coefficients[2,4]
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d[[g]]):max(d[[g]])
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+
+
+
+
+
+layout(matrix(1:2, 1), respect=TRUE)
+g = "SNORA8"
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+plot(c(d[[g]],0,max(d[,gs]),0,max(d[,gs])), c(s,0,0,1,1), main=paste0("sex~",g), xlab=g, ylab="sex")
+
+res = sapply(gs, function(g) {
+  print(g)
+  m = glm(c(s,0,0,1,1)~c(d[[g]],0,max(d[,gs]),0,max(d[,gs])), 
+    family = binomial(logit))
+  b = m$coefficients[[2]]
+  pv = summary(m)$coefficients[2,4]
+  c(pval = pv,beta = b)
+})
+
+res = t(res)
+res = as.data.frame(res)
+head(res)
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(res$beta, -log10(res$pval), main="volcano plot")
+text(res$beta, -log10(res$pval), rownames(res))
+plot(-log10(res$pval), main="Manhattan plot")
+text(res$beta, -log10(res$pval), rownames(res))
+rownames(res)[which(res$pval == min(res$pval))]
+
+plot(res$beta, -log10(res$pval), main="volcano plot")
+text(res$beta, -log10(res$pval), rownames(res))
+
+
+
+g = "USP9Y"
+
+layout(matrix(1:2, 1), respect=TRUE)
+boxplot(d[[g]]~s)
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d[[g]], family = binomial(logit))
+summary(m)$coefficients
+pv = summary(m)$coefficients[2,4]
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d[[g]]):max(d[[g]])
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+
+
+
+
+
+g = "LINC02428"
+
+layout(matrix(1:2, 1), respect=TRUE)
+boxplot(d[[g]]~s)
+plot(d[[g]], s, main=paste0("sex~",g), xlab=g, ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d[[g]], family = binomial(logit))
+summary(m)$coefficients
+pv = summary(m)$coefficients[2,4]
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d[[g]]):max(d[[g]])
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+
+
+```
+
+
+#On voit que le gène "USP9Y" explique mieux le sexe. Je fais donc un modèle de regression logistique en fonction de ce gène pour prédire le sexe.
+
+```{r}
+d$sex
+
+model1 <- glm(
+    formula = as.factor(sex) ~ USP9Y 
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model1, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = as.factor(d$sex))[ 1 ]
+pred[ !idx ] <- levels(x = as.factor(d$sex))[ 2 ]
+table(pred, useNA = "ifany")
+```
+
+#On pourra être tenté de faire plutôt un modèle en fonction de ce gène et de l'histologie mais le score 
+#obtenu sur Codalab avec le modèle en fonction de ce gène uniquement nous semble correcte.
+#Ce gène explique mieux car ce gène est seulement présent chez les hommes.
+```{r}
+### DO NOT CHANGE THIS PART
+saveRDS(pred, "results.rds")
+```
+

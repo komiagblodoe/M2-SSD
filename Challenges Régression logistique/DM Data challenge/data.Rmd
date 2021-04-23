@@ -1,0 +1,31 @@
+---
+title: Data
+output:
+  rmarkdown::html_document
+---
+
+The data set 'data_learn.rds' is composed of the following information :
+
+```{r echo=TRUE}
+d = readRDS(file="data_learn.rds")
+```
+
+ - Biological attributes are:    `r c("age", "sex", "histology")`.
+ - Histological attribuites are: `r c("tissue_status")`
+ - Clinical attributes are:      `r c("os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade")`
+ - Gene columns are named:
+
+```{r, echo=TRUE}
+gs = names(d)[13:1012]
+```
+
+
+```{r results="verbatim", echo=TRUE}
+dim(d)
+head(d[,1:4])
+sum(is.na(d[,1:4]))
+head(d[,5:12])
+table(is.na(d[,5:12]))
+head(d[,gs[1:5]])
+table(is.na(d[,gs]))
+```

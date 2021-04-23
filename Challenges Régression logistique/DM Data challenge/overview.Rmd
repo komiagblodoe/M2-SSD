@@ -1,0 +1,12 @@
+---
+title: Overview
+output:
+  rmarkdown::html_document
+---
+
+The challenge provides the data.frame `d` of tumoral tissues described by genes expression values, histological and clinical attributes.
+
+**The goal of the challenge** is to predict the histology values using provided gene expression values, histological and clinical attributes.
+
+```{r child='data.Rmd'}
+```

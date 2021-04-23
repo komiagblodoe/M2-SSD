@@ -1,0 +1,137 @@
+---
+title: "Rapport Data Challenge"
+author: "AGBLODOE Komi M2 SSD"
+date: "1 décembre 2019"
+output: html_document
+---
+
+
+
+#Introduction
+
+Le cancer du poumon est l'un des cancers les plus fréquemment diagnostiqués et contribue à la majorité des décès liés au cancer. Les adénocarcinomes de poumons (LUAD) et les carcinomes épidermoÏdes de poumons (LUSC)  sont des sous-types de cancer du poumon. LUAD est en augmentation constante dans la proportion de cancers du poumon, qui est actuellement le type histologique le plus fréquemment diagnostiqué chez les hommes et les femmes adultes. Le tabagisme est la principale cause de cancer du poumon, mais LUAD est le type histologique montrant une faiblesse associée au tabagisme, qui touche principalement les non-fumeurs et les femmes.
+
+
+#Objectif
+
+Le but de notre étude consiste à prédire l'histologie (LUAD ou LUSC) de 100 patients, à partir des données cliniques et des données d'expression de gènes.
+
+
+Méthodes statistiques utilisées 
+
+#premier modèle du script
+
+```{r,echo=TRUE,eval=FALSE}
+model <- glm(
+    formula = histology ~ age + sex 
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+```
+
+Avec ce premier modèle du script on remarque que le sexe explique beaucoup plus l'histologie alors que l'âge n'est pas significatif.On obtient avec ce modèle comme valeurs prédites, 34 pour TCGA-LUAD et 66 pour TCGA-LUSC.
+
+#Deuxième modèle
+
+Ensuite, j'ai fait donc un autre modèle en y ajoutant d'autres variables sans les gènes.
+
+```{r,echo=TRUE,eval=FALSE}
+model <- glm(
+    formula = histology ~ sex + t + age + n + m + tnm_stage
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+
+```
+
+Avec ce modèle, je constate que seuls le sexe (sexM) et la variable m (mMX) sont très significatifs.Avec ce modèle,on prédit comme valeurs 49 pour TCGA-LUAD et 51 pour TCGA-LUSC.
+De ce résultat, j'ai pensé qu'il serait intéressant de faire un modèle en conservant le sexe et la variable m tout en y incluant les gènes.
+
+#Troisième modèle
+
+Pour se faire, dans un premier temps, j'ai fait un modèle en fonction de chaque gène tout en retenant les 15 plus petits p-values (c'est à dire les 15 premiers les plus significatifs).
+Dans un second temps, j'ai décidé de faire un modèle en prenant en compte les 15 premiers gènes les plus significatifs et les variables sex et m.
+
+```{r,echo=TRUE,eval=FALSE}
+gs = names(d)[13:1012]
+p_values = rep(NA, length(gs))
+names(p_values) <- gs
+
+for (i in 1:length(gs)) {
+  model <- glm(
+    formula = histology ~ d[, gs[i]],
+    data = d,
+    family = binomial(link = 'logit')
+  )
+  
+  coeffs = summary(model)$coefficient
+  if (nrow(coeffs) != 1) {
+    p_values[i] = summary(model)$coefficient[2, 4]
+  }
+}
+
+p_values_min = head(sort(p_values), n = 15)
+genes_selected = paste(names(p_values_min), collapse = "+", sep = "")
+form = paste("histology ~", genes_selected)
+
+model <- glm(
+    formula = histology ~ sex + m + LINC02428+DLX6+SPDEF+SERPINB2+KRT42P+LINC01503+SMO+MCM2+TMEM189+CDHR1+FBL+SNCA+SERPINB5+KPNA1
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+
+```
+
+Avec ce modèle,on prédit comme valeurs 50 pour TCGA-LUAD et 50 pour TCGA-LUSC. 
+J'obtiens un score de 0.93 avec ce modèle.Je remarque alors que les gènes sont plus signicatifs comparés aux variables sex et m. De  là, j'ai pensé à faire un modèle uniquement en fonction des gènes sélectionnés.
+
+#Quatrième modèle
+
+J'ai donc fait le modèle avec les 15 gènes les plus significatifs tout en faisant une sélection de variables.
+```{r,echo=TRUE,eval=FALSE}
+form = paste("histology ~", genes_selected)
+
+model <- glm(
+  formula = as.formula(form),
+  data = d,
+  family = binomial(link = 'logit')
+)
+step(model, dir = "backward")
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+```
+
+Ce modèle a permis de prédire comme valeurs 51 pour TCGA-LUAD et 49 pour TCGA-LUSC.Ce modèle m'a permis d'avoir un score de 0.94 qui est meilleur comparé aux autres.
+Avec la sélection de variables, le meilleur modèle retenu sur le critère d'AIC est celui dont la formule est la suivante:
+formula = histology ~ SPDEF + LINC01503 + TMEM189 + CDHR1 + 
+    FBL + SNCA + SERPINB5 + KPNA1.
+    
+    
+Conclusion
+
+Au regard des résulats avec les différents modèles et sur la base de nos données, on peut conclure que les gènes expliquent mieux  les sous-types de cancer que sont les adénocarcinomes de poumons (LUAD) et les carcinomes épidermoÏdes de poumons (LUSC).

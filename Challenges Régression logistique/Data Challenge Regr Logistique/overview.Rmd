@@ -1,0 +1,6 @@
+The challenge provides the data.frame `d` of tumoral tissues described by genes expression values, histological and clinical attributes.
+
+**The goal of the challenge** is to predict the sex values using provided gene expression values, histological and clinical attributes.
+
+```{r child='data.Rmd'}
+```

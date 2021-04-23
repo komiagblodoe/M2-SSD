@@ -1,0 +1,65 @@
+---
+title: "Untitled"
+author: "AGBLODOE Komi/ VRIGNAUD Thomas M2 SSD"
+date: "1 décembre 2019"
+output: html_document
+---
+
+```{r echo=TRUE, results="verbnatim", label="generate_zip_file"}
+### DO NOT CHANGE THIS PART
+d <- readRDS("data_learn.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    d[[ v ]] <- as.factor(x = d[[ v ]])
+}
+#summary(object = d)
+
+test <- readRDS("data_test_histology.rds")
+for ( v in c("sex", "tissue_status", "histology", "os_months", "dead", "dead_at_24_months", "t", "n", "m", "tnm_stage", "tnm_grade") ) {
+    test[[ v ]] <- as.factor(x = test[[ v ]])
+}
+#summary(object = test)
+
+## PUT YOUR SCRIPT HERE
+model <- glm(
+    formula = histology ~ age + sex 
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+```
+
+
+```{r}
+model <- glm(
+    formula = histology ~ sex + t + age + n + m + tnm_stage
+  , data = d
+  , family = binomial(link = 'logit')
+)
+summary(object = model)
+
+pred <- predict.glm(object = model, newdata = test, type = "response")
+idx  <- pred <= 0.5
+pred[  idx ] <- levels(x = d$histology)[ 1 ]
+pred[ !idx ] <- levels(x = d$histology)[ 2 ]
+table(pred, useNA = "ifany")
+
+
+### DO NOT CHANGE THIS PART
+saveRDS(pred, "results.rds")
+zip_filename <- paste0(
+    "results_"
+  , format(x = Sys.time( ), format = "%Y_%m_%d_-_%s")
+  , ".zip"
+)
+if ( !{ "zip" %in% installed.packages( ) } ) {
+    install.packages(pkgs = "zip")
+}
+zip::zip(zip_filename, "results.rds")
+print(zip_filename)
+```

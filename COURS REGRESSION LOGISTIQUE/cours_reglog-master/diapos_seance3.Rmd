@@ -1,0 +1,682 @@
+---
+title: "Régression Logistique"
+subtitle: "Séance 3"
+author: "Florent Chuffart & Magali Richard (d'après le cours de Lydiane Agier)"
+date: "20 Novembre 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE, width = 75)
+knitr::opts_chunk$set(echo = TRUE, fig.align='center', dev='png', dpi = 95, out.width = "100%")
+```
+
+---
+
+
+# Plan
+
+I) Rappel : Modèle, OR, RR et test de significativité
+II) Adequation du modèle aux données
+III) Réduction de variables
+
+
+---
+
+## I) Rappel régression logistique : notation et modèle
+
+### Principe
+
+Objectif : Modéliser une **variable binaire** en fonction d’une ou plusieurs autres covariables (quali ou quanti)
+$$Y \sim X$$
+$$E(Y|X) \sim X$$
+
+Par exemple, on cherche à connaitre la probabilité qu’un individu soit un homme sachant sa taille, son poids, ses habitudes alimentaires.
+
+
+
+### La fonction *logit*
+
+
+\begin{eqnarray}
+              \text{logit: } ]0,1[ & \rightarrow & \mathbb{R} \\
+                                 x & \rightarrow & logit(x)  =  log(\frac{x}{1-x}) \\ 
+logit^{-1}(y) = \frac{1}{1+e^{-y}} & \rightarrow & y
+\end{eqnarray}
+
+
+
+### La régression logistique
+
+Comme en régression linéaire, l’objet de cette modélisation est *d’estimer les coefficients $\beta$* :
+
+
+\begin{eqnarray}
+         logit(E(Y|X))    & = & \beta X             \\
+          logit(P(Y=1|X)) & = & \beta X             \\
+           logit(\pi(X)) & = & \beta X             \\
+                  \pi(X) & = & logit^{-1}(\beta X) 
+\end{eqnarray}
+
+On obtient ainsi $\pi(X)$, le prédicteur de Y en fonction de X.
+
+
+
+---
+
+## I) Rappel régression logistique :  vraisemblance
+
+- **Définition** : Probabilité d’observer un évènement si le modèle envisagé est vrai
+
+- Le modèle conditionnel de $Y$ sachant $X$ est : $E(Y|X = x) \sim B(\pi(x))$
+
+- Pour l’observation $i$, la contribution à la vraisemblance est donc:
+$$l(x_i, y_i) = P(y_i = 1|x_i)^{y_i} (1-P(y_i=1|x_i))^{1-y_i} = \pi(x_i)^{y_i}(1-\pi(x_i))^{1-y_i} $$
+
+
+si $y_i = 1$ : 
+\begin{eqnarray}
+l(x_i, 1) &=& P(y_i = 1|x_i)^1 (1-P(y_i=1|x_i))^0 &=& \pi(x_i)^1 (1-\pi(x_i))^0 \\
+&=& P(y_i = 1|x_i) 1 &=& \pi(x_i) 1 \\
+&=& P(y_i = 1|x_i) &=& \pi(x_i) \\
+\end{eqnarray}
+
+
+
+
+si $y_i = 0$ : 
+\begin{eqnarray}
+l(x_i, 0) &=& P(y_i = 1|x_i)^0 (1-P(y_i=1|x_i))^1 &=& \pi(x_i)^0(1-\pi(x_i))^1 \\
+&=& 1 (1-P(y_i=1|x_i)) &=& 1 (1-\pi(x_i)) \\ 
+&=& 1-P(y_i=1|x_i) &=& 1-\pi(x_i) \\ 
+\end{eqnarray}
+
+```{r}
+d = read.table("data/data_nutri.csv", header=TRUE, sep=",", row.names = 1)
+d$sex = as.factor(d$sex)
+s = as.numeric(d$sex) - 1
+#DT::datatable(d, width = "100%")
+# head(d)
+```
+
+
+```{r echo=FALSE, results="hide"}
+d[c(2, 16),c("poids", "sex")]
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+py1x = function(t,m) {
+  x = m$coefficients[[1]] + m$coefficients[[2]]*t
+  1/(1 + exp(-x))
+}
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d$poids):max(d$poids)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=1, lwd=2)
+legend("bottomright", "Y=Pi(X)", col=1, lty=1, cex=0.6)
+legend("bottomright", c("Y=Pi(X)", "l(xi, yi)"), col=1:2, lty=1, cex=0.6)
+
+
+points(d$poids[2], s[2], col=2, pch=16)
+arrows(d$poids[2], 1, d$poids[2], py1x(d$poids,m)[2], col=adjustcolor(2, alpha.f=0.5), length=0.05, lwd=3)
+
+points(d$poids[16], s[16], col=2, pch=16)
+arrows(d$poids[16], 0, d$poids[16], py1x(d$poids,m)[16], col=adjustcolor(2, alpha.f=0.5), length=0.05, lwd=3)
+
+
+
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+arrows(d$poids, s, d$poids, py1x(d$poids,m), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright","1 - P(Y=yi|X=xi)", col=4, lty=1, cex=0.6)
+
+
+
+
+
+
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$poids, s, main="sex~poids, coef[1] step by 1", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+x = min(d$poids):max(d$poids)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+coefs = m$coefficients
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2)
+coefs[1] = coefs[1] - 5 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[1] = coefs[1] + 1
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+
+
+plot(d$poids, s, main="sex~poids, coef[2] step by 0.01", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+x = min(d$poids):max(d$poids)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+coefs = m$coefficients
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2)
+coefs[2] = coefs[2] - 0.1 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+coefs[2] = coefs[2] + 0.01 
+lines(x, logitinv(coefs[[1]] + coefs[[2]]*x), col=1, lwd=2, lty=2)
+
+
+```
+
+
+---
+
+##  I) Rappel regression logistique :
+
+ 
+### Les mesures d'interêt
+
+Comment interpréter $\widehat{\beta_k}$ ?  Quel est l‘effet de la variable $X_k$ sur $logit(P(Y=1|X))$ ?
+
+
+- *Définition*  **odds** 
+
+$$Odds(X) = \frac{\pi(X)}{1-\pi(X)} \iff Odds(X) = e^{\beta X}$$
+
+- *Définition*  **odds ratio** 
+
+$$ OR_{u/\nu} = \frac{odd(X = u)}{odd(X=\nu)} = e^{\beta (u-v)}$$
+ 
+ 
+- *Définition* **risque relatif** 
+
+$$ RR_{u/\nu} = \frac{\pi(X = u)}{\pi(X=\nu)} = \frac{P(Y=1|X=u)}{P(Y=1|X=\nu)} $$
+
+
+
+**$OR$ est directement calculable à partir des coefficients de la régression $\beta$**
+
+$OR$ estime le rapport malades/non-malades et $RR$ estime le risque (i.e. la probabilité) d’être malade.
+
+Ils donnent la même indication sur la relation entre $Y$ et $X$ :
+
+1) Si $RR_{u/\nu}$ (ou $OR_{u/\nu}$) $>1$ alors il y a plus de risque de $Y=1$ si $X=u$ que si $X=\nu$
+2) Si $RR_{u/\nu}$ (ou $OR_{u/\nu}$) $<1$ alors il y a moins de risque de $Y=1$ si $X=u$ que si $X=\nu$
+3) Si $RR_{u/\nu}$ (ou $OR_{u/\nu}$) $=1$ alors $Y$ n’est pas influencée par $X=u$ vs. $X=\nu$ (i.e. Y indépendant des catégories $u$ et $\nu$ de $X$)
+
+
+---
+
+##  I) Rappel regression logistique :
+
+### La significativité du paramêtre $\beta_k$
+
+On veut tester l’influence du facteur $X_k$. 
+
+$$\left\lbrace
+\begin{array}{l}
+H_0 : {\beta_k = 0} \\
+H_1 : {\beta_k \neq 0}
+\end{array}
+\right.$$
+
+Test de Wald pour un unique paramètre : $T = \Big(\frac {\widehat\beta_k} {\widehat\sigma_{\widehat\beta_k}}\Big)^2 \sim \mathcal{X}^2_1$
+
+### Comparaison de modèles emboités
+
+On veut tester si l’ajout de paramètres est pertinent.
+
+ - Soit $m_1$ un modèle emboité dans $m_2$ (*i.e.* toutes les variables de $m_1$ sont dans $m_2$)
+ - $m_2$ comprend $p$ variables explicatives supplémentaires par rapport à $m_1$
+ - $L_1$ est la valeur de vraisemblance de $m_1$
+ - $L_2$ est la valeur de vraisemblance de $m_2$
+ 
+Test du rapport de vraisemblance : $T = -2(log(L_1) - log(L_2)) \sim \mathcal{X}^2_p$
+
+
+---
+
+## II) Adéquation du modèle
+
+Comment mesurer si le modèle construit **prédit de façon efficace** les données observées ?
+
+Mesurer l’**adéquation** du modèle **aux données** c’est étudier essentiellement :
+
+- L’*écart global* entre les valeurs prédites et les valeurs observées (i.e. mesures globales)
+
+-- Calibration du modèle (concordance entre les valeurs prédites et observées) : **Test de Hosmer-Lemeshow**
+
+-- Pouvoir discriminant du modèle :  courbe **ROC** et critère **AUC** (Area Under Curve)
+
+
+- La *contribution* de chaque observation au modèle (détection des outliers)
+
+-- Résidus de Pearson 
+
+-- Résidus de déviance
+
+
+
+---
+
+## II)  Adéquation du modèle : Test de Howmer-Lemeshow
+
+### Principe
+
+- Pour chaque observation $i$, on calcule la probabilité prédite $\widehat{P}(Y=1|x_i) = \widehat{\pi}(x_i)$.
+
+- On regroupe les observations par quantiles de distribution de la valeur prédite (*i.e.* par valeurs croissantes en $K$ groupes $G_k$  de taille égale; on prend souvent $K=10$).
+
+- Pour chaque groupe d’observations $G_k$ , on compare le nombre de sujets pour lesquels $Y=1$ ($n_{1k}$), au nombre de sujets malades prédits par le modèle ($\widehat{n}_{1k}$)
+
+$$n_{1k} = \sum_{i\in{G_k}}y_i \ \ \ \ \ \ \ \ \ vs. \ \ \ \ \ \ \ \ \ \ \widehat{n}_{1k} = \sum_{i\in{G_k}}\widehat{\pi}(x_i)$$
+
+
+- De même on calcule $n_{0k}$ et $\widehat{n}_{0k}$
+
+$$n_{0k} = \sum_{i\in{G_k}} (1-y_i) \ \ \ \ \ \ \ \ \ vs. \ \ \ \ \ \ \ \ \ \ \widehat{n}_{1k} = \sum_{i\in{G_k}}(1-\widehat{\pi}(x_i))$$
+
+- On compare ces valeurs observées $n_jk$ aux valeurs prédites  $\widehat{n}_jk$     (on voudrait idéalement qu’elles soient égales) par un test de $\mathcal{X}^2_{K-2}$ à $K-2$ degrés de libertés
+
+Rq: il faut que pour tout $k$, $n_jk >5$ et $\widehat{n}_jk >5$ pour pouvoir appliquer ce test.
+
+---
+
+## II)  Adéquation du modèle : Test de Howmer-Lemeshow
+
+### Exemple
+
+$$H_0 : {\widehat{n}_{1k} = n_{1k}}, \forall j,k$$	
+$$H_1 : \exists (j,k), \widehat{n}_{1k} \neq n_{1k} $$
+
+```{r}
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+test = ResourceSelection::hoslem.test (s, m$fitted.values)
+test
+```
+
+La p-valeur du test de Hosmer-Lemeslow est > 0.05, on consreve $H_0$ et les valeurs prédites et observées concordent bien, le modèle est bon. 
+
+Définition des groupes par quantiles de probabilités prédites $\widehat{\pi}(x_i)$
+
+```{r}
+test[[6]]
+```
+
+*Cutyhat*: Définition des groupes par quantiles de probabilités prédites $\widehat{\pi}(x_i)$
+
+*y0 et y1*: $n_{jk}$ le nombre **observé** de sujets $Y=0$ et $Y=1$ par groupe
+
+```{r}
+test[[7]]
+```
+
+*yhat0 et yhat1*: $n_{jk}$ le nombre **estimé** de sujets $Y=0$ et $Y=1$ par groupe
+
+---
+
+## II)  Adéquation du modèle : courbe ROC
+
+### Principe
+
+Le **pouvoir discriminant** correspond à la capacité du modèle à correctement classer les observations.
+
+- Pour chaque observation $i$, on calcule la probabilité prédite $\widehat{P}(Y=1|x_i) = \widehat{\pi}(x_i)$.
+
+- On définit pour un seuil $s \in [0,1]$ choisi :
+$$ \widehat{Y}_i = \Bigg\{
+\begin{align}
+1 && \text{si} && \widehat{\pi}(x_i) \geq s \\ 
+0 && \text{sinon}
+\end{align}
+$$
+
+- La **proportion de bien classés** correspond à :
+$$ \frac{\# \{\widehat{Y}_i = 1, Y_i = 1\} + \# \{\widehat{Y}_i = 0, Y_i = 0\}}{n} $$
+
+
+
+
+- La **Sensibilité** correspond à la proportion de bien classées parmi les observations pour lesquelles $Y=1$, $$ sensibilité = \frac{\# \{\widehat{Y}_i = 1, Y_i = 1\}}{\# \{Y_i = 1\}} $$
+
+
+- La **Spécificité** correspond à la proportion de bien classées parmi les oservations pour lesquelles $Y=0$, $$spécificité =  \frac{\# \{\widehat{Y}_i = 0, Y_i = 0\}}{\# \{Y_i = 0\}} $$
+
+- On cherche à **maximiser sensibilité et spécificité** en faisant varier $s \in [0,1]$
+
+---
+
+## II)  Adéquation du modèle : courbe ROC
+
+### Exemple
+
+
+On recherche le seuil $s$ optimum (souvent le plus proche de $sensibilité=1$ et $spécificité=1$)
+
+```{r}
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+ROC = pROC::roc(response=s, m$fitted.values)
+plot(ROC, xlim=c(1,0))
+```
+
+On recherche le seuil pour lequel on maximise la sensibilité et la spécificité).
+
+
+```{r}
+plot(ROC, xlim=c(1,0))
+test = (1-ROC$sensitivities)^2+(1-ROC$specificities)^2
+wh = which(test==min(test))
+ROC$thresholds[wh]
+points(ROC$sensitivities[wh], ROC$sensitivities[wh], col = 2, cex = 2, lwd = 2)
+```
+
+--- 
+
+## II)  Adéquation du modèle : AUC
+
+### Principe
+
+AUC signifie "aire sous la courbe ROC". 
+
+AUC           | Discrimination
+------------- | -------------
+0.5           | Nulle
+0.7 - 0.8     | Acceptable
+0.8 - 0.9     | Excellente
+> 0.9         | Exceptionnelle
+
+Plus l’aire sous la courbe augmente, plus le modèle est capable de bien classer les observations:
+
+- Si $AUC = 0.5$ alors le modèle classe de manière complètement aléatoire les observations
+
+- Si $AUC > 0.9$ le modèle est très bon, voire trop bon, il faut évaluer s’il y a overfitting
+ 
+--- 
+
+## II)  Adéquation du modèle : AUC
+
+## Exemple
+
+```{r}
+m1 = glm(s~d$poids, family = binomial(logit))
+m2 = glm(s~d$taille, family = binomial(logit))
+m3 = glm(s~d$taille+d$poids, family = binomial(logit))
+ROC1 = pROC::roc(response=s, m1$fitted.values)
+ROC2 = pROC::roc(response=s, m2$fitted.values)
+ROC3 = pROC::roc(response=s, m3$fitted.values)
+plot(ROC1, xlim=c(1,0), col=2)
+lines(ROC2, xlim=c(1,0), col=4)
+lines(ROC3, xlim=c(1,0), col="grey")
+legend("bottomright", lty=1, c("s~poids", "s~taille", "s~taille+poids"), col=c("2", "4", "grey"))
+```
+
+
+---
+
+
+
+## II)  Adéquation du modèle : les résidus
+
+
+Résidus de Pearson :
+
+$$ r_{p_i} = \frac{Y_i - \widehat{\pi}_i}{\sqrt{\widehat{\pi}_i(1-\widehat{\pi}_i)}} $$
+
+Résidus de déviance : 
+
+
+$$r_{D_i} = \left  \lbrace
+\begin{array}{l}
+\sqrt(2|log(\widehat{\pi}_i)|)      \ \ \ \  \text{si}\  Y_i=1  \\
+ - \sqrt(2|log(1-\widehat{\pi}_i)|) \ \ \ \  \text{si}\  Y_i=0
+\end{array}
+\right.$$
+
+
+
+Rend compte de la contribution de chaque individu
+
+Permet de détecter les valeus extrêmes
+
+
+---
+
+## III) Sélection de variables
+
+- Critères de choix
+
+  -- Critère du $R^2$ 
+  
+  -- Critètre d’information d’Akaike (AIC)
+  
+  -- Critètre d’information bayesien (BIC)
+
+- Procédure de sélection de variable
+
+-- Forward (ou pas à pas ascendante)
+
+-- Backward (ou pas à pas descendante)
+
+-- Stepwise
+
+---
+
+## III) Sélection de variables : c  ritères
+
+### Pseudo-$R^2$ (Cox-Snell, Nagelkerke)
+
+Augmente de façon monotone avec l’introduction de nouvelles variables 
+
+
+### Critètre d'information d'Akaike (AIC)
+
+Le critère AIC est défini par : 
+
+$$AIC = -2log(L_n(\widehat{\beta})) + 2p$$
+
+### Critètre d'information bayesien (BIC)
+
+Le critère BIC est défini par : 
+
+$$BIC = -2log(L_n(\widehat{\beta})) + p \log(n)$$
+
+
+Pour l’AIC et le BIC : 
+
+- le critère s’applique aux modèles estimés par une méthode du **maximum de vraisemblance**
+- le meilleur modèle est celui qui minimise le critère
+
+
+Le BIC est plus parcimonieux que l’AIC puisqu’il pénalise plus le nombre de variables présentent de le modèle.
+
+---
+
+
+## III) Sélection de variables : méthodes
+
+Méthodes les plus classiques:
+
+- Forward (ou pas à pas ascendante)
+
+- Backward (ou pas à pas descendante)
+
+- Stepwise
+
+Ces méthodes s’appuient sur les **données recueillies**
+
+Elles sont **itératives**
+
+Elle dépendent de **paramètres** (à valeur prédéfinie)
+
+Bien que l’efficacité de ces méthodes ne puisse être démentie par la pratique, il ne serait pas raisonnable de se fier uniquement aux résultats statistiques fournis par un
+algorithme. En effet, pour décider d’ajouter ou de supprimer une variable dans un modèle, il faut conserver :
+
+- une part d’intuition
+
+- une part de déduction
+
+- une part de synthèse
+
+
+---
+
+## III) Sélection de variables : forward
+
+### Principe
+
+1) On part du modèle le plus **simple** :
+
+- Modèle vide (avec uniquement la constante)
+
+- Ou modèle avec les variables d’ajustement
+
+2) On **ajoute une à une** les variables :
+
+- En se basant sur le test de rapport de vraisemblance
+
+- En ajoutant à chaque pas, parmi les variables restantes, celle qui est la plus significative (selon un critère donné)
+
+3) On **s’arrête quand il n’y a plus de variables à ajouter** (selon un critère prédéfini, eg. valeur minimale de p-valeur du test, en général 0.10)
+
+---
+
+## III) Sélection de variables : forward
+
+### Exemple
+
+```{r}
+m0 = glm(s~d$poids, family = binomial(logit))
+step(m0, scope = "~d$poids+d$taille+d$age", dir = "forward")
+```
+
+---
+
+## III) Sélection de variables : backward
+
+### Principe
+
+1) On part du modèle **le plus complexe**, i.e. avec toutes les variables incluses
+
+2) On **retire une à une** les variables:
+
+- En se basant sur le test de rapport de vraisemblance
+
+- En retirant à chaque pas, parmi les variables incluses, celle qui est la moins significative (selon un critère donné)
+
+3) On **s’arrête quand il n’y a plus de variables «à retirer»** (selon un critère prédéfini, eg. valeur minimale de p-valeur du test, en général 0.9)
+
+---
+
+## III) Sélection de variables : backward
+
+### Exemple
+
+```{r}
+mc = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+step(mc, dir = "backward")
+```
+
+---
+
+## III) Sélection de variables : stepwise
+
+### Principe
+
+1) On part d’un **modèle donné**.
+
+2) A chaque pas, on peut **soit retirer une variable, soit ajouter une variable**:
+
+- En se basant sur le test de rapport de vraisemblance
+
+- soit (selon un critère donné): en retirant, parmi les variables incluses, celle qui est la moins significative ou en ajoutant, parmi les variables restantes, celle qui est la plus significative.
+
+3) On s’arrète quand il n’y a plus de variables «à retirer» ou «à ajouter»
+
+---
+
+## III) Sélection de variables : stepwise
+
+### Exemple
+
+```{r}
+m0 = glm(s~d$poids, family = binomial(logit))
+step(mc, scope = "~d$poids+d$taille+d$age", dir = "both")
+```
+---
+
+## III) Procédure de séletion de variable
+
+### Comment choisir ?
+
+1) On partira plutôt:
+
+- Du modèle vide (procédure frontward ou stepwise) si on a beaucoup de covariables, peu d’à priori sur leur influence sur Y, et des risques de collinéarité des covariables.
+
+- Du modèle complet (procédure backward ou stepwise) lorsqu’on a pré-selectionné des variables parce qu’on a un fort à priori sur leur influence sur Y.
+
+2) La procédure stepwise est souvent privilégiée car plus souple (i.e. en «tâtonnant», plus de chances de tomber sur le bon modèle), bien qu’elle soit plus lourde (i.e. plus de variables testées à chaque pas, donc plus long temps de calcul).
+
+

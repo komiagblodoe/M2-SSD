@@ -1,0 +1,600 @@
+---
+title: "Régression Logistique"
+subtitle: "Séance 1"
+author: "Florent Chuffart & Magali Richard (d'après le cours de Lydiane Agier)"
+date: "`r Sys.Date()`"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE, width = 75)
+knitr::opts_chunk$set(echo = TRUE, fig.align='center', dev='png', dpi = 95, out.width = "100%")
+```
+
+---
+
+## Cours 
+
+- https://github.com/magrichard/cours_reglog
+
+
+## Pré-requis
+ 
+ - R https://cran.r-project.org 
+ - RStudio https://www.rstudio.com
+
+
+## Evaluation
+
+ - individuelle : 
+ 
+     - mini questionnaire à la fin de chaque séance
+
+     - *data challenge* à la maison aprés les 2 premières séances de "Régression Logistique" 
+
+ - en équipe : *data challenge* en 12h à la fin des séances "Régression Logistique" et "Survie" (10 janvier 2019)
+
+
+## 3 Data Challenges
+ 
+ - *sexpred* : prédir le sexe de 100 patients à partir de 500 observations 
+ - *histpred* : prédir l’histologie de 100 patients à partir de 500 observations
+ - *virpred* : prédir la virulence  de 100 patients à partir de 500 observations
+
+
+---
+
+# Plan
+
+I) Rappel (régression linéaire)
+II) Introduction à la regression logistique
+III) Formalisme et principe (modèle logit)
+IV) Estimation des coefficients beta
+v) Test de significativité
+
+
+---
+
+## I.  Régression linéaire (rappel) 
+
+Y est expliquée (modélisée) par  les variables explicatives $X= (X_1,X_2,...,X_p)$.
+
+Si $p=1$, c’est une fonction affine de X.
+
+Modèle : $$E(Y)  = \beta X= \beta_0 + \beta_1X_1 + … + \beta_pX_p$$
+
+avec $\beta=(\beta_0, \beta_1, …, \beta_p)$ estimé par les moindres carrées 
+
+$$\beta = argmin(\sum_{i=1}^{n} {(y_i - \beta_0 - \beta_1x_{1,i} - ... - \beta_px_{p,i})^2)}$$ 
+
+Sous l’hypothèse de normalité des résidus, l’estimateur des moindres carrés est équivalent à l’estimateur du maximum de vraisemblance pour la régression linéaire :
+
+- La valeur estimée (ajustée) de Y est $\widehat{y}_i =  \widehat{\beta}_0 + \widehat{\beta}_1X_1 +  … + \widehat{\beta}_pX_p$
+- Les résidus sont estimés par $e_i = y_i -\widehat{y}_i$
+- La variance du terme d’erreur est estimée par $s^2 = \frac{1}{n-2} \sum_{i=1}^{n}{e_i^2}$
+
+
+---
+
+## I) Données : data_nutri
+
+```{r}
+d = read.table("data/data_nutri.csv", header=TRUE, sep=",", row.names = 1)
+d$sex = as.factor(d$sex)
+DT::datatable(d, width = "100%")
+# head(d)
+```
+
+---
+
+## I) Exemple 1
+
+```{r}
+# README RStudio config, uncheck: # preferences > R Markdown > show output inline for... 
+layout(matrix(1:2, 1, byrow=TRUE), respect=TRUE)
+plot(d$taille, d$poids, main="poids~taille")
+## Model
+# Y~X
+# E(Y) = b.X
+# E(Y) = b_0 + b_1.X
+# Y_i = b_0 + b_1.X_i + e_i
+m = lm(d$poids~d$taille)
+m$coefficients
+abline(a=m$coefficients[[1]], b=m$coefficients[[2]], col=2) # /!\ y = b.x + a
+# residuals
+m$residuals
+arrows(d$taille, d$poids, d$taille, d$poids-m$residuals, col=adjustcolor(4, alpha.f=0.5), length=0.1)
+legend("topleft",c("regression line", "residuals"), col=c(2,4), lty=1, cex=.8)
+```
+
+---
+
+## I) Exemple 2
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$sex, d$poids, main="poids~sex", xlab="sex", ylab="poids")
+## Model
+# Y~X
+# E(Y) = b.X
+# E(Y) = b_0 + b_1.X
+# Y_i = b_0 + b_1.X_i + e_i
+m = lm(d$poids~d$sex)
+m$coefficients
+abline(h=m$coefficients[[1]], col=2)
+abline(h=m$coefficients[[1]] + m$coefficients[[2]], col=4)
+legend("bottomright",c("b_0", "b_0+b_1"), col=c(2,4), lty=1, cex=.8)
+
+plot(d$sex, d$poids, main="poids~sex", xlab="sex", ylab="poids")
+points(as.numeric(d$sex), d$poids)
+x = jitter(as.numeric(d$sex), 0.5)
+points(x, d$poids)
+arrows(x, d$poids, x, d$poids-m$residuals, col=adjustcolor(4, alpha.f=0.5), length=0.1)
+legend("bottomright",c("residuals"), col=c(4), lty=1, cex=0.6)
+
+# t.test
+# 1 null hypothesis
+# H_0: p_h==_f
+# H_1: p_h!=p_f
+# 2 risk
+# alpha = 5%
+# 3 test hypothesis
+# residuals~N?
+shapiro.test(d[d$sex=="Femme",]$poids)
+shapiro.test(d[d$sex=="Homme",]$poids)
+# -> OK
+# 4 t.test
+t.test(d[d$sex=="Femme",]$poids, d[d$sex=="Homme",]$poids)
+anova(m)
+# 5 conclusion
+```
+
+---
+
+## II) Introduction à la regression logistique : objectifs
+
+Objectif : Modéliser une **variable binaire** en fonction d’une ou plusieurs autres covariables (quali ou quanti)
+$$Y \sim X$$
+$$E(Y|X) \sim X$$
+
+Exemple de variable à expliquer : 
+  
+  - Le sexe en fonction du poids
+  - Maladie coronarienne en fonction d’HTA et cholestérol
+  - Survenue de cancer en fonction d’expositions chimiques
+  - Consommation d’un bien selon variables sociodémographiques
+  - Risque d’accoucher d’un bébé de faible poids (<2500g) en fonction de l’âge de la mère, du poids, du tabagisme.
+  - le sexe en fonction de l’expression des gènes (challenge *sexpred*)
+  - l’histoplogie en fonction de l’expression des gènes (challenge *histpred*)
+  - la survie à 24 mois en fonction de l’expression des gènes (challenge *virpred*)
+
+---
+
+## II) Exemple 3
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+s = as.numeric(d$sex) - 1
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+## Model
+# Y~X
+# E(Y) = b.X
+# E(Y) = b_0 + b_1.X
+# Y_i = b_0 + b_1.X_i + e_i
+m = lm(s~d$poids)
+m$coefficients
+abline(a=m$coefficients[[1]], b=m$coefficients[[2]], col=2, lwd=2) # /!\ y = b.x + a
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# residuals
+arrows(d$poids, s, d$poids, s-m$residuals, col=adjustcolor(4, alpha.f=0.2), length=0.1, lwd=2)
+legend("bottomright",c("regression line", "residuals"), col=c(2,4), lty=1, cex=0.6)
+```
+
+---
+
+## III) Formalisme : 
+
+### Variable de Bernoulli
+
+- Toute variable binaire peut être **codée en 0/1**, et est alors considérée comme une Variable de Bernoulli de distribution:
+ 
+$$P(Y=1)=p$$
+$$P(Y=0)=1-p$$ 
+$$P(Y=k)=p^k(1-p)^{1-k}, k \in \{0,1\}$$ 
+
+
+### Principe
+
+ - On pose Y la variable binaire,
+ - X le vecteur des covariables/variables explicatives (qualitatives ou quantitatives)
+ - On veut modéliser $E(Y|X) = f(X)$ avec $E(Y|X) = P(Y=1|X)$ noté $\pi (X)$
+
+---
+
+## III) Formalisme : 
+
+### Fonction logit
+
+
+\begin{eqnarray}
+              \text{logit: } ]0,1[ & \rightarrow & \mathbb{R} \\
+                                 x & \rightarrow & logit(x)  =  log(\frac{x}{1-x}) \\ 
+\end{eqnarray}
+
+$$ \lim_{x\to0} logit(x) = -\infty $$
+$$ \lim_{x\to1} logit(x) = +\infty $$
+
+La fonction *logit* s’inverse :
+
+
+\begin{eqnarray}
+              \text{logit: } \mathbb{R}& \rightarrow &  ]0,1[  \\
+                      y & \rightarrow & logit^{-1}(y) = \frac{1}{1+e^{-y}}  
+\end{eqnarray}
+
+
+
+
+---
+
+## III) Exemple 4 : la fonction logit
+
+```{r}
+# logit: [0,1] -> R
+#            p -> log(p/1-p)
+# logit(p) = log(p/1-p)
+x = 0:100/100
+layout(matrix(1:6, 2, byrow=TRUE), respect=TRUE)
+plot(x, log(x/(1-x)), main="logit")
+plot(log(x/(1-x)), x, main="logit^-1")
+```
+
+
+
+
+
+
+
+
+
+---
+
+## III) Formalisme : le modèle logistique
+
+On utilise donc le modèle logistique:
+    $$logit(E(Y|X)) = \beta X$$
+    $$logit(P(Y=1|X))= \beta X$$ 
+    $$logit(\pi (X))= \beta X$$ 
+    $$\pi (X)= logit^{-1}(\beta X)$$ 
+
+
+On obtient ainsi $\pi(X)$, le prédicteur de Y en fonction de X.
+
+Comme en régression linéaire, l’objet de cette modélisation est *d’estimer les coefficients $\beta$*
+
+
+
+---
+
+## III) Exemple 5 : le modèle logistique
+
+```{r}
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d$poids):max(d$poids)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+legend("bottomright", "logit(Y)=b.X", col=2, lty=1, cex=0.6)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+py1x = function(t,m) {
+  x = m$coefficients[[1]] + m$coefficients[[2]]*t
+  1/(1 + exp(-x))
+}
+arrows(d$poids, s, d$poids, py1x(d$poids,m), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright","P(Y|X)", col=4, lty=1, cex=0.6)
+```
+
+
+
+
+---
+
+## IV) Estimation : la vraisemblance
+
+- **Définition** : Probabilité d’observer un évènement si le modèle envisagé est vrai
+
+- La fonction de vraisemblance dépend de la distribution de $Y$
+
+- On note les covariables globales théoriques: $X=(X_1,...,X_p)$ et observées : $x=(x_1,...,x_p)$. Les covariables individuelles observées sont notées : $x_i=(x_{1i},...,x_{pi})$
+
+- Le modèle conditionnel de $Y$ sachant $X$ est : $E(Y|X = x) \sim B(\pi(x))$
+
+- Pour l’observation $i$, la contribution à la vraisemblance est donc:
+$$l(x_i, y_i) = P(y_i = 1|x_i)^{y_i} (1-P(y_i=1|x_i))^{1-y_i} = \pi(x_i)^{y_i}(1-\pi(x_i))^{1-y_i} $$
+
+
+---
+
+## IV) Estimation : les coefficients (1/2)
+
+- Le modèle s’écrit:  $logit(E(Y|X_1,...,X_p)) = \beta_0 + \beta_1X_1+...+\beta_pX_p$
+Les paramètres $\beta = (\beta_0,\beta_1, ..., \beta_p)$ sont inconnus
+
+- On estime $\beta$ par **maximum de vraisemblance**.
+
+- La vraisemblance conditionnelle est:
+$$\prod_{i=1}^{n} l(x_i, y_i) = \prod_{i=1}^{n} \pi(x_i)^{y_i}(1-\pi(x_i))^{1-y_i} = \prod_{i=1}^{n} \Big(\frac{\pi(x_i)}{1-\pi(x_i)}\Big)^{y_i}(1-\pi(x_i))$$
+
+
+---
+
+## IV) Estimation : les coefficients (2/2)
+
+
+- La vraisemblance conditionnelle est:
+$$\prod_{i=1}^{n} l(x_i, y_i) = \prod_{i=1}^{n} \pi(x_i)^{y_i}(1-\pi(x_i))^{1-y_i} = \prod_{i=1}^{n} \Big(\frac{\pi(x_i)}{1-\pi(x_i)}\Big)^{y_i}(1-\pi(x_i))$$
+- En passant au logarithme, on a :
+
+$$log(L_n(\beta)) = \sum_{i=1}^{n}\Big[ y_i * log \Big(\frac{\pi(x_i)}{1-\pi(x_i)}\Big) + log(1-\pi(x_i))\Big] $$
+
+- Cette fonction contient des valeurs observées $y_i$ et des valeurs prédites $\pi(x_i)$ qui dépendent de $\beta$
+
+- On maximise cette fonction en trouvant la valeur de $\beta$ *pour laquelle la dérivée (par rapport à $\beta$) est nulle*  : $L_n'(\beta) = 0$, definissant ainsi : 
+$$\widehat{\beta}_n = argmax L_n(\beta)$$
+
+---
+
+## IV) Estimation : remarques
+
+- Il n’existe pas de **solution analytique** de $L_n'(\beta) = 0$
+
+- L’estimation de  $\widehat{\beta}$  est donc fait **par approximation** (d’où des résultats potentiellement différents selon l’algorithme), avec souvent la démarche suivante:
+1) Le logiciel propose une première valeur pour $\beta$ et calcule la vraisemblance associée
+2) Il cherche de nouvelles valeurs «plausibles» pour $\beta$ et voit si elles améliorent la vraisemblance
+3) Et réitère cela jusqu’à atteindre une condition, eg. la différence de vraisemblance est <0.00001
+
+- L’estimateur $\widehat{\beta}$ est estimé par le modèle, et non pas observé: sa valeur **dépend du modèle utilisé et de la validité de celui-ci**.
+
+---
+
+## IV) Estimation : Propriétés de l'estimateur (1/2)
+
+- Asymptotiquement (i.e quand n tend vers l'infini), l’estimateur du maximum de vraisemblance:
+1) existe et est unique
+2) est sans biais  (i.e. il tend vers sa valeur réelle)
+3) est de distribution normale
+4) est efficace (i.e. de variance minimale parmi tous les estimateurs sans biais obtenus avec d’autres méthodes).
+
+- Ainsi: $\lim_{n\to\infty} \sqrt{n}(\widehat{\beta}-\beta) \rightarrow N(0,\Sigma^{-1})$ avec $\Sigma^{-1}$ la matrice de variance-covariance de $\beta$ 
+
+---
+
+## IV) Estimation : Propriétés de l'estimateur (2/2)
+
+
+- On en déduit les **intervalles de confiance** pour $\beta_k$:
+
+$$ IC(\widehat{\beta}) = \Big[\widehat{\beta_k} -t_{1-\alpha/2,n-2} * \sqrt{\widehat{var}(\widehat{\beta_k})} ; \widehat{\beta_k}+t_{1-\alpha/2,n-2} * \sqrt{\widehat{var}(\widehat{\beta_k})} \Big]$$
+
+Avec  $t_{1-\alpha/2,n-2}$ le quantile de niveau $1-\alpha/2$ de la loi de student à (n-2) degrés de liberté 
+
+En pratique approximé dès que $n>30$ par $u1-\alpha/2$ le quantile de niveau $1-\alpha/2$ de la loi normale
+
+---
+
+## IV) Estimation : Valeurs prédites et résidus
+
+A partir de $\widehat{\beta}$ , on peut calculer:
+
+1) les **valeurs prédites** : $\pi(X)$ 
+
+i.e. la probabilité estimée de $Y=1$ pour chaque individu en fonction de ses caractéristiques
+
+2) les **résidus** : $\epsilon = Y - \widehat{\pi}(X)$
+
+Ceux-ci peuvent servir à estimer l’adéquation du modèle aux données (vus plus loin)
+
+
+
+---
+
+# Exemple 6
+```{r}
+
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m$coefficients
+summary(m)
+
+layout(matrix(1:2, 1, byrow=TRUE), respect=TRUE)
+plot(d$taille, d$poids, main="poids~taille", col=s+1)
+## Model
+# Y~X
+# E(Y) = b.X
+# E(Y) = b_0 + b_1.X
+# Y_i = b_0 + b_1.X_i + e_i
+m = lm(d$poids~d$taille)
+m$coefficients
+abline(a=m$coefficients[[1]], b=m$coefficients[[2]], col=2) # /!\ y = b.x 
+
+
+
+layout(matrix(1:2, 1), respect=TRUE)
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d$poids, family = binomial(logit))
+m$coefficients
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d$poids):max(d$poids)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+py1x = function(t,m) {
+  x = m$coefficients[[1]] + m$coefficients[[2]]*t
+  1/(1 + exp(-x))
+}
+arrows(d$poids, s, d$poids, py1x(d$poids,m), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright","P(Y|X)", col=4, lty=1, cex=0.6)
+
+
+x = min(d$poids):max(d$poids)
+plot(x,log(logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x) / (1-logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x))))
+plot(x,logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x) / (1-logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x)))
+plot(x,exp(m$coefficients[[1]] + m$coefficients[[2]]*x))
+
+x = 72
+logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x) / (1-logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x))
+
+
+
+
+
+plot(d$taille, s, main="sex~taille", xlab="taille", ylab="sex")
+# P(Y=1|X) = logitinv(a + b.x)
+m = glm(s~d$taille, family = binomial(logit))
+m$coefficients
+logitinv = function(x) 1/(1 + exp(-x))
+x = min(d$taille):max(d$taille)
+lines(x, logitinv(m$coefficients[[1]] + m$coefficients[[2]]*x), col=2, lwd=2)
+py1x = function(t,m) {
+  x = m$coefficients[[1]] + m$coefficients[[2]]*t
+  1/(1 + exp(-x))
+}
+arrows(d$taille, s, d$taille, py1x(d$taille,m), col=adjustcolor(4, alpha.f=0.2), length=0.05, lwd=3)
+legend("bottomright","P(Y|X)", col=4, lty=1, cex=0.6)
+
+
+```
+
+
+
+
+---
+
+## V) Test de significativité des paramètres 
+
+- On veut tester l’influence de $X_k$. On teste: $$H_0 : {\beta_k = 0}$$	vs. $$H_1 : {\beta_k \neq 0}$$
+
+- Il existe 3 tests:
+1) Test de Wald
+2) Test du score (peu utilisé, pas vu ici)
+3) Test du rapport de vraisemblance (pour modèles emboités)
+
+---
+
+## V) Test de Wald 
+
+$$ \sqrt{n\Sigma^{1/2}}(\widehat{\beta}-\beta) \rightarrow \mathcal{N}(0,I_p) $$
+$$ T =n(\widehat\beta-\beta)'\widehat\Sigma^{-1}(\widehat\beta-\beta) \xrightarrow[]{L} \mathcal{X}^2_p $$
+avec $n$ le nombre d'observations et $p$ le nombre de paramètres testés.
+
+Rq, pour un unique paramètre on a $T = \Big(\frac {\widehat\beta_k} {\widehat\sigma_{\widehat\beta_k}}\Big)^2 \sim \mathcal{X}^2_p$
+
+- On rejette $H_0$ si: 
+$$T>z^p_{1-\alpha}$$
+avec $z^p_{1-\alpha}$ le quantile de niveau $(1-\alpha)$ de la loi de $\mathcal{X}^2$ à $p$ ddl.
+
+---
+
+## V) Exemple Test de Wald
+
+```{r}
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m$coefficients
+summary(m)$coefficient
+```
+
+```{r}
+#Wald test for weight effect
+summary(m)$coefficient[2,4]
+#Wald test for size effect
+summary(m)$coefficient[3,4]
+#Wald test for age effect
+summary(m)$coefficient[4,4]
+```
+
+```{r, eval=FALSE}
+library(aod)
+varEst = summary(m1)$cov.unscaled
+Est = summary(m1)$coefficient[,1]
+Est
+#wald test for age
+wald.test(Sigma = varEst, b = Est , Terms = 4)
+```
+
+---
+
+## V) Test du rapport de vraisemblance
+
+Soit mod1 un modèle emboité dans mod2 (i.e. toutes les variables dans mod1 sont dans mod2) avec mod2 qui comprend $p$ variables explicatives supplémentaires par rapport à mod1 avec:
+
+$L1$ la valeur de vraisemblance de mod1 et $L2$ la valeur de vraisemblance de mod2. On a:
+
+$$ T = -2[log(L_1) - log(L_2)] \rightarrow \mathcal{X}^2_p$$
+Rq: On appelle $D= - 2 log(L1))$ la déviance pour mod1
+
+*!! Il faut que ces modèles soient appliquées aux même observations (entre autres, pas de données manquantes)*
+
+- On rejette $H_0$ si: 
+$$T>z^p_{1-\alpha}$$
+avec $z^p_{1-\alpha}$ le quantile de niveau $(1-\alpha)$ de la loi de $\mathcal{X}^2$ à $p$ ddl.
+
+*!! Il faut que l’ajout des $p$ variables apportent suffisamment au modèle pour être considérées «utiles»*
+
+---
+
+## V) Exemple Test du rapport de vraisemblance
+
+$H_0 : {\beta_{age} = 0}$	vs. $H_1 : {\beta_{age} \neq 0}$
+
+```{r}
+m1 = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m2 = glm(s~d$poids+d$taille, family = binomial(logit))
+anova(m2, m1, test="Chisq")
+```
+
+$H_0 : {(\beta_{poids}, \beta_{age}) = (0,0)}$	vs. $H_1 :{(\beta_{poids}, \beta_{age}) \neq (0,0)}$
+
+```{r}
+m1 = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m2 = glm(s~d$taille, family = binomial(logit))
+anova(m2, m1, test="Chisq")
+```
+
+```{r, eval=FALSE}
+library(aod)
+varEst = summary(m1)$cov.unscaled
+Est = summary(m1)$coefficient[,1]
+Est
+#wald test for age
+wald.test(Sigma = varEst, b = Est , Terms = c(1,3)
+```
+---
+
+##  V) Comment utiliser les tests de significativité?
+
+- Ces tests peuvent  être utilisés pour **comparer des modèles**, et décider s’il faut ou non inclure une variable dans notre modèle explicatif de Y.
+
+- Ils sont aussi utiles pour **tester une variable catégorielle** en testant conjointement toutes ses catégories 
+
+Rappels sur les tests
+
+![](fig/test.png)
+
+- Souvent dans les tests, on cherche à contrôler le risque de type 1, au niveau $\alpha$.
+
+Si on a p-valeur du test=4%, c’est que si $H_0$ est vrai, et qu’on répétait la simulation 100 fois, on aurait obtenu 4 fois une valeur de statistique de test égale ou plus extrême que celle observée.
+
+---
+
+
+## sexpred
+
+
+https://competitions.codalab.org/competitions/21853?secret_key=b50bf124-3513-4190-9397-ddd6c2561aea
+
+
+
+---
+

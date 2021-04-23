@@ -1,0 +1,418 @@
+---
+title: "Régression Logistique"
+subtitle: "Séance 2"
+author: "Florent Chuffart & Magali Richard (d'après le cours de Lydiane Agier)"
+date: "20 Novembre 2018"
+output: slidy_presentation
+---
+
+```{r setup, include=FALSE}
+options(htmltools.dir.version = FALSE, width = 75)
+knitr::opts_chunk$set(echo = TRUE, fig.align='center', dev='png', dpi = 95, out.width = "100%")
+```
+
+---
+
+## Cours 
+
+- https://github.com/magrichard/cours_reglog
+
+
+## Pré-requis
+ 
+ - R https://cran.r-project.org 
+ - RStudio https://www.rstudio.com
+
+
+## Evaluation
+
+ - individuelle : 
+ 
+     - mini questionnaire à la fin de chaque séance
+
+     - *data challenge* à la maison aprés les 2 premières séances de "Régression Logistique" 
+
+ - en équipe : *data challenge* en 12h à la fin des séances "Régression Logistique" et "Survie" (10 janvier 2019)
+
+
+## 3 Data Challenges
+ 
+ - *sexpred* : prédir le sexe de 100 patients à partir de 500 observations 
+ - *histpred* : prédir l’histologie de 100 patients à partir de 500 observations
+ - *virpred* : prédir la virulence  de 100 patients à partir de 500 observations
+
+
+---
+
+# Plan
+
+I) Rappel 
+II) Test de significativité
+III) Réduction de variables
+
+---
+
+## I) Rappel
+
+```{r}
+d = read.table("data/data_nutri.csv", header=TRUE, sep=",", row.names = 1)
+d$sex = as.factor(d$sex)
+#DT::datatable(d, width = "100%")
+# head(d)
+```
+
+
+```{r}
+layout(matrix(1:2, 1), respect=TRUE)
+s = as.numeric(d$sex) - 1
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+## Model
+# Y~X
+# E(Y) = b.X
+# E(Y) = b_0 + b_1.X
+# Y_i = b_0 + b_1.X_i + e_i
+m = lm(s~d$poids)
+m$coefficients
+abline(a=m$coefficients[[1]], b=m$coefficients[[2]], col=2, lwd=2) # /!\ y = b.x + a
+plot(d$poids, s, main="sex~poids", xlab="poids", ylab="sex")
+# residuals
+arrows(d$poids, s, d$poids, s-m$residuals, col=adjustcolor(4, alpha.f=0.2), length=0.1, lwd=2)
+legend("bottomright",c("regression line", "residuals"), col=c(2,4), lty=1, cex=0.6)
+```
+
+---
+
+## II) Test de significativité des paramètres 
+
+- On veut tester l’influence de $X_k$. On teste: $$H_0 : {\beta_k = 0}$$	vs. $$H_1 : {\beta_k \neq 0}$$
+
+- Il existe 3 tests:
+1) Test de Wald
+2) Test du score (peu utilisé, pas vu ici)
+3) Test du rapport de vraisemblance (pour modèles emboités)
+
+---
+
+## II) Test de Wald 
+
+$$ \sqrt{n\Sigma^{1/2}}(\widehat{\beta}-\beta) \rightarrow \mathcal{N}(0,I_p) $$
+$$ T =n(\widehat\beta-\beta)'\widehat\Sigma^{-1}(\widehat\beta-\beta) \xrightarrow[]{L} \mathcal{X}^2_p $$
+avec $n$ le nombre d'observations et $p$ le nombre de paramètres testés.
+
+Rq, pour un unique paramètre on a $T = \Big(\frac {\widehat\beta_k} {\widehat\sigma_{\widehat\beta_k}}\Big)^2 \sim \mathcal{X}^2_p$
+
+- On rejette $H_0$ si: 
+$$T>z^p_{1-\alpha}$$
+avec $z^p_{1-\alpha}$ le quantile de niveau $(1-\alpha)$ de la loi de $\mathcal{X}^2$ à $p$ ddl.
+
+
+Le test de Wald et test de Fisher sont équivalents dans le cas particulier du modèle gaussien.
+
+---
+
+## II) Exemple Test de Wald
+
+```{r}
+m = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m$coefficients
+summary(m)$coefficient
+```
+
+```{r}
+#Wald test for weight effect
+summary(m)$coefficient[2,4]
+#Wald test for size effect
+summary(m)$coefficient[3,4]
+#Wald test for age effect
+summary(m)$coefficient[4,4]
+```
+
+```{r}
+library(aod)
+varEst = summary(m)$cov.unscaled
+varEst
+Est = summary(m)$coefficient[,1]
+Est
+#wald test for age
+wald.test(Sigma = varEst, b = Est , Terms = 2)
+wald.test(Sigma = varEst, b = Est , Terms = 3)
+wald.test(Sigma = varEst, b = Est , Terms = 4)
+
+```
+
+Utile pour les variables à >2 catégories, pour tester la significativité globale de la variable
+
+```{r, eval=FALSE}
+library(aod)
+m3 = glm(s~d$poids+d$taille+d$age+d$viande, family = binomial(logit))
+varEst = summary(m3)$cov.unscaled
+varEst
+Est = summary(m3)$coefficient[,1]
+Est
+#wald test for age
+wald.test(Sigma = varEst, b = Est , Terms = c(4,8))
+
+```
+
+---
+
+## II) Test du rapport de vraisemblance
+
+Soit mod1 un modèle emboité dans mod2 (i.e. toutes les variables dans mod1 sont dans mod2) avec mod2 qui comprend $p$ variables explicatives supplémentaires par rapport à mod1 avec:
+
+$L1$ la valeur de vraisemblance de mod1 et $L2$ la valeur de vraisemblance de mod2. On a:
+
+$$ T = -2[log(L_1) - log(L_2)] \rightarrow \mathcal{X}^2_p$$
+Rq: On appelle $D= - 2 log(L1))$ la déviance pour mod1
+
+*!! Il faut que ces modèles soient appliquées aux même observations (entre autres, pas de données manquantes)*
+
+- On rejette $H_0$ si: 
+$$T>z^p_{1-\alpha}$$
+avec $z^p_{1-\alpha}$ le quantile de niveau $(1-\alpha)$ de la loi de $\mathcal{X}^2$ à $p$ ddl.
+
+*!! Il faut que l’ajout des $p$ variables apportent suffisamment au modèle pour être considérées «utiles»*
+
+---
+
+## II) Exemple Test du rapport de vraisemblance
+
+$H_0 : {\beta_{age} = 0}$	vs. $H_1 : {\beta_{age} \neq 0}$
+
+```{r}
+m1 = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m2 = glm(s~d$poids+d$taille, family = binomial(logit))
+anova(m2, m1, test="Chisq")
+```
+
+$H_0 : {(\beta_{poids}, \beta_{age}) = (0,0)}$	vs. $H_1 :{(\beta_{poids}, \beta_{age}) \neq (0,0)}$
+
+```{r}
+m1 = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+m2 = glm(s~d$taille, family = binomial(logit))
+anova(m2, m1, test="Chisq")
+```
+
+---
+
+##  II) Comment utiliser les tests de significativité?
+
+- Ces tests peuvent  être utilisés pour **comparer des modèles**, et décider s’il faut ou non inclure une variable dans notre modèle explicatif de Y.
+
+- Ils sont aussi utiles pour **tester une variable catégorielle** en testant conjointement toutes ses catégories 
+
+Rappels sur les tests
+
+![](fig/test.png)
+
+- Souvent dans les tests, on cherche à contrôler le risque de type 1, au niveau $\alpha$.
+
+Si on a p-valeur du test=4%, c’est que si $H_0$ est vrai, et qu’on répétait la simulation 100 fois, on aurait obtenu 4 fois une valeur de statistique de test égale ou plus extrême que celle observée.
+
+---
+
+## III) Sélection de variables
+
+- Critères de choix
+
+  -- Critère du $R^2$ 
+  
+  -- Critètre d’information d’Akaike (AIC)
+  
+  -- Critètre d’information bayesien (BIC)
+
+- Procédure de sélection de variable
+
+-- Forward (ou pas à pas ascendante)
+
+-- Backward (ou pas à pas descendante)
+
+-- Stepwise
+
+---
+
+## III) Sélection de variables : c  ritères
+
+### Pseudo-$R^2$ (Cox-Snell, Nagelkerke)
+
+Augmente de façon monotone avec l’introduction de nouvelles variables 
+
+
+### Critètre d'information d'Akaike (AIC)
+
+Le critère AIC est défini par : 
+
+$$AIC = -2log(L_n(\widehat{\beta})) + 2p$$
+
+### Critètre d'information bayesien (BIC)
+
+Le critère BIC est défini par : 
+
+$$BIC = -2log(L_n(\widehat{\beta})) + p \log(n)$$
+
+
+Pour l’AIC et le BIC : 
+
+- le critère s’applique aux modèles estimés par une méthode du **maximum de vraisemblance**
+- le meilleur modèle est celui qui minimise le critère
+
+
+Le BIC est plus parcimonieux que l’AIC puisqu’il pénalise plus le nombre de variables présentent de le modèle.
+
+---
+
+
+## III) Sélection de variables : méthodes
+
+Méthodes les plus classiques:
+
+- Forward (ou pas à pas ascendante)
+
+- Backward (ou pas à pas descendante)
+
+- Stepwise
+
+Ces méthodes s’appuient sur les **données recueillies**
+
+Elles sont **itératives**
+
+Elle dépendent de **paramètres** (à valeur prédéfinie)
+
+Bien que l’efficacité de ces méthodes ne puisse être démentie par la pratique, il ne serait pas raisonnable de se fier uniquement aux résultats statistiques fournis par un
+algorithme. En effet, pour décider d’ajouter ou de supprimer une variable dans un modèle, il faut conserver :
+
+- une part d’intuition
+
+- une part de déduction
+
+- une part de synthèse
+
+
+---
+
+## III) Sélection de variables : forward
+
+### Principe
+
+1) On part du modèle le plus **simple** :
+
+- Modèle vide (avec uniquement la constante)
+
+- Ou modèle avec les variables d’ajustement
+
+2) On **ajoute une à une** les variables :
+
+- En se basant sur le test de rapport de vraisemblance
+
+- En ajoutant à chaque pas, parmi les variables restantes, celle qui est la plus significative (selon un critère donné)
+
+3) On **s’arrête quand il n’y a plus de variables à ajouter** (selon un critère prédéfini, eg. valeur minimale de p-valeur du test, en général 0.10)
+
+---
+
+## III) Sélection de variables : forward
+
+### Exemple
+
+```{r}
+m0 = glm(s~d$poids, family = binomial(logit))
+step(m0, scope = "~d$poids+d$taille+d$age", dir = "forward")
+```
+
+---
+
+## III) Sélection de variables : backward
+
+### Principe
+
+1) On part du modèle **le plus complexe**, i.e. avec toutes les variables incluses
+
+2) On **retire une à une** les variables:
+
+- En se basant sur le test de rapport de vraisemblance
+
+- En retirant à chaque pas, parmi les variables incluses, celle qui est la moins significative (selon un critère donné)
+
+3) On **s’arrête quand il n’y a plus de variables «à retirer»** (selon un critère prédéfini, eg. valeur minimale de p-valeur du test, en général 0.9)
+
+---
+
+## III) Sélection de variables : backward
+
+### Exemple
+
+```{r}
+mc = glm(s~d$poids+d$taille+d$age, family = binomial(logit))
+step(mc, dir = "backward")
+```
+
+---
+
+## III) Sélection de variables : stepwise
+
+### Principe
+
+1) On part d’un **modèle donné**.
+
+2) A chaque pas, on peut **soit retirer une variable, soit ajouter une variable**:
+
+- En se basant sur le test de rapport de vraisemblance
+
+- soit (selon un critère donné): en retirant, parmi les variables incluses, celle qui est la moins significative ou en ajoutant, parmi les variables restantes, celle qui est la plus significative.
+
+3) On s’arrète quand il n’y a plus de variables «à retirer» ou «à ajouter»
+
+---
+
+## III) Sélection de variables : stepwise
+
+### Exemple
+
+```{r}
+m0 = glm(s~d$poids, family = binomial(logit))
+step(mc, scope = "~d$poids+d$taille+d$age", dir = "both")
+```
+---
+
+## III) Procédure de séletion de variable
+
+### Comment choisir ?
+
+1) On partira plutôt:
+
+- Du modèle vide (procédure frontward ou stepwise) si on a beaucoup de covariables, peu d’à priori sur leur influence sur Y, et des risques de collinéarité des covariables.
+
+- Du modèle complet (procédure backward ou stepwise) lorsqu’on a pré-selectionné des variables parce qu’on a un fort à priori sur leur influence sur Y.
+
+2) La procédure stepwise est souvent privilégiée car plus souple (i.e. en «tâtonnant», plus de chances de tomber sur le bon modèle), bien qu’elle soit plus lourde (i.e. plus de variables testées à chaque pas, donc plus long temps de calcul).
+
+---
+
+## Evaluation Séance 2
+
+### Challenge histpred
+
+The challenge provides the data.frame d of tumoral tissues described by genes expression values, histological and clinical attributes.
+
+The goal of the challenge is to predict the sex values using provided gene expression values, histological and clinical attributes.
+
+[Challenge URL](https://competitions.codalab.org/competitions/21853?secret_key=b50bf124-3513-4190-9397-ddd6c2561aea)
+
+
+### Compte rendu
+
+Sous forme de [questionnaire](https://forms.gle/H5Yh94RXnoxC6ewL7)
+
+A rendre avant le *mardi 19 novembre 2019*
+
+### Rappel
+
+Le [questionnaire](https://forms.gle/LQg34Noej99VGB3t7) de la séance 1 est à rendre avant le *mercredi 20 novembre 2019*
+
+---
+
+## Devoir Maison
+
+Avec compte-rendu libre à rendre avant le *3 décembre*: URL à déposer sur le [Questionnaire](https://forms.gle/oVVrAoiU9DRPLY937) séance 3.
+
+OUverture du challenge le 22 novembre (vous serez notifiés par email).
