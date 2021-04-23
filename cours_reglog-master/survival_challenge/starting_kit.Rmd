@@ -1,0 +1,317 @@
+---
+title: "Survival data challenge, starting kit"
+author: "Florent Chuffart"
+date: "`r Sys.Date()`"
+output: 
+  rmarkdown::html_document:
+    toc: true
+    toc_float: true
+    toc_depth: 3
+    number_sections: true
+---
+
+
+# Overview of the Survival challenge
+
+## How to participate?
+
+The challenge is hosted on the codalab platform:
+
+https://competitions.codalab.org/competitions/21360?secret_key=1b0893b2-c695-4c9b-ae33-334ac7a056ac
+
+To participate, you need to:
+
+1- create an acount on the codalab platform
+
+2- subscribe to the *Survival challenge*
+
+3- constitute teams (up to 4 people) and design a team coordinator on the platform
+
+## How to start?
+
+In the [participate](https://competitions.codalab.org/competitions/21360#participate-get_starting_kit) window, go in the *Files* tab and download the public data. 
+
+Save the 3 files contained into **challenge_ssd2019_public_data** in the same folder than the starting kit. 
+
+## What is the aim of the challenge?
+
+The challenge is to classify a subset of cancer patients according to discriminating survival groups. You need to submit your classification to the codalab platform. A cox survival p-value will be computed according to your classification, this corresponds to your score on the leaderboard. Try to improve you score!
+
+You will participate to 2 challenges:
+
+- Challenge #1: Exploration phase. You need to classify the patients with 'challenge1' `exp_grp$sets` id.
+
+- Challenge #2: Final test phase. You need to classify the patients with 'challenge2' `exp_grp$sets` id.
+
+Use the training set ('training' id in `exp_grp$sets`) to determine your best classification model.
+
+**Warning**  
+
+  - You have only **one** opportunity to submit to Challenge 2, to avoid over fitting.
+  - The Challenge 2 will be opened from 5pm to 8pm. 
+  
+## How do I get information?
+  
+Section 2 indicates where the data are coming from.
+
+Section 3 and 4 explain how to load the data , what are the data, and how to identify the patients.
+
+Section 5 and 6 display exemples of data exploration.
+
+Please go to section 7 to see an exemple of result submission on the cadalab platform.
+
+## What will be the evaluation?
+
+At 8pm, you will have to return a report of 5 pages maximum including an introduction, the methods you used, and a discussion of the results obtained.
+
+You will be evaluated on the quality of your classification (results submission on the codalab paltform), your creativity to achieve this goal and the clarity of your report.
+
+# References
+
+
+```{r, echo=FALSE, eval=TRUE}
+knitr::opts_chunk$set(collapse=TRUE, comment = "#>", fig.width=9, fig.height=6, eval=TRUE, echo=TRUE, results="hide")
+require(survival)
+scurve = function (ss, v, colors = c("deepskyblue", "black", "red"), main = "Survival", 
+    legend, nb_sign = 3, legend_place = "topright", PLOT_LEGEND = TRUE, 
+    cex.leg = 1, censoring, ...) 
+{
+    idx = !is.na(ss)
+    ss = ss[idx]
+    if (missing(v)) {
+        v = rep(1, sum(idx))
+    }
+    else {
+        v = v[idx]
+    }
+    if (!missing(censoring)) {
+        date = ss[, 1]
+        state = ss[, 2]
+        idx = !is.na(date) & date > censoring
+        date[idx] = censoring
+        state[idx] = 0
+        ss = survival::Surv(date, state)
+    }
+    if (length(unique(v)) == 1) {
+        cox_results = 1
+    }
+    else {
+        cox_results = coxres(ss, as.character(v))
+    }
+    pv = cox_results[1]
+    if (pv < 1e-100) {
+        pvt = "<1e-100"
+    }
+    else {
+        pvt = format(pv, digits = 3, scientific = TRUE)
+    }
+    sf = survival::survfit(ss ~ v)
+    levels = length(na.omit(unique(v)))
+    col = colorRampPalette(colors)(levels)
+    main = paste(main, " p_cox=", signif(as.numeric(pvt), nb_sign), 
+        sep = "")
+    plot(sf, col = col, main = main, ...)
+    tab = table(v)
+    tab = tab[tab != 0]
+    if (PLOT_LEGEND) {
+        if (missing(legend)) {
+            if ("breaks" %in% names(attributes(v))) {
+                b = signif(attr(v, "breaks"), 3)
+                legend = paste("[", b[1:(length(b) - 1)], ",", 
+                  b[2:length(b)], c(rep("[", length(b) - 2), 
+                    "]"), sep = "")
+            }
+            else {
+                legend = names(tab)
+            }
+        }
+        legend = paste(legend, " (", tab, ")", sep = "")
+        legend(legend_place, legend = legend, col = col, pch = 3, 
+            lty = 1, cex = cex.leg)
+    }
+    return(cox_results)
+}
+
+coxres = function (ss, v) 
+{
+    f = suppressWarnings(survival::coxph(ss ~ v))
+    sf = summary(f)
+    pvcox = sf$logtest[3]
+    tf = survival::cox.zph(f)
+    tf = tf$table
+    pvhz = tf[dim(tf)[1], 3]
+    hr = sf$conf.int[1, 1]
+    hrlb = sf$conf.int[1, 3]
+    hrub = sf$conf.int[1, 4]
+    res = c(pvcox, pvhz, hrlb, hr, hrub)
+    names(res) = c("pvcox", "pvhz", "hrlb", "hr", "hrub")
+    return(res)
+}
+```
+
+Data are coming from the TCGA (The cancer genome atlas). They were extracted from severla cohorts of patients. Here are TCGA Study Abbreviations corresponding to each cancer:
+
+https://gdc.cancer.gov/resources-tcga-users/tcga-code-tables/tcga-study-abbreviations
+
+
+
+# Loading data
+
+`exp_grp` corresponds to metadata associated with the patients (2049 patients).
+
+`data` corresponds to gene expression data for each pations patients (9466 genes).
+
+`pf` corresponds to informations related to each gene.
+
+```{r}
+exp_grp = readRDS(file="challenge_ssd2019_e.rds")
+head(exp_grp)
+dim(exp_grp)
+data    = readRDS(file="challenge_ssd2019_d.rds")
+head(data)
+dim(data)
+pf      = readRDS(file="challenge_ssd2019_p.rds")
+head(pf)
+dim(pf)
+```
+
+# Tumoral and non tumoral samples 
+
+```{r}
+idx_nt = rownames(exp_grp)[exp_grp$tissue_status == "normal"] 
+idx_tu = rownames(exp_grp)[exp_grp$tissue_status == "tumoral"] 
+```
+
+```{r}
+idx_training = rownames(exp_grp)[exp_grp$sets == "training"] 
+length(idx_training)
+idx_challenge1 = rownames(exp_grp)[exp_grp$sets == "challenge1"]
+length(idx_challenge1)
+idx_challenge2 = rownames(exp_grp)[exp_grp$sets == "challenge2"] 
+length(idx_challenge2)
+```
+# PCA
+
+##  Non tumoral tissues
+
+Guttman effect
+
+```{r}
+pca = prcomp(t(data[,idx_nt]), scale=FALSE)
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+
+
+col = as.numeric(as.factor(exp_grp[idx_nt,]$tissue_group_level1))
+layout(matrix(1:2,1), respect=TRUE)
+barplot(p[1:10], ylab="% of var")
+
+i = 1
+j = 2
+plot(pca$x[,i], pca$x[,j], 
+  xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), 
+  ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"),
+  col=col
+)
+legend("topright", pch=16, col=1:length(unique(exp_grp[idx_nt,]$tissue_group_level1)), levels(as.factor(exp_grp[idx_nt,]$tissue_group_level1)))
+
+
+for (i in c(1,3,5,7)) {
+  j = i+1
+  plot(pca$x[,i], pca$x[,j], 
+    xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), 
+    ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"),
+    col=col
+  )  
+}
+
+```
+
+## Tumoral tissues
+
+```{r}
+pca = prcomp(t(data[,idx_tu]), scale=FALSE)
+v = pca$sdev * pca$sdev
+p = v / sum(v) * 100
+
+
+col = as.numeric(as.factor(exp_grp[rownames(pca$x),]$main_gse_number))
+layout(matrix(1:2,1), respect=TRUE)
+barplot(p[1:10], ylab="% of var")
+
+i = 1
+j = 2
+plot(pca$x[,i], pca$x[,j], 
+  xlab=paste0("PC", i, "(", signif(p[i], 3), "%)"), 
+  ylab=paste0("PC", j, "(", signif(p[j], 3), "%)"),
+  col=col
+)
+legend("topright", pch=16, col=1:length(unique(exp_grp[rownames(pca$x),]$main_gse_number)), levels(as.factor(exp_grp[rownames(pca$x),]$main_gse_number)))
+
+
+```
+
+
+# Survival
+
+We plot survival according to: 
+
+   - cancer type
+  - sex
+  - cancer stage 
+  - level of expression of ATAD2 gene
+
+```{r label="survival"}
+layout(matrix(1:2, 1), respect=TRUE)
+scurve(exp_grp$os, exp_grp$main_gse_number, main="cancer")
+scurve(exp_grp$os, exp_grp$sex, main="sex")
+scurve(exp_grp$os, exp_grp$tnm_stage, main="stage")
+scurve(exp_grp$os, data["ATAD2",rownames(exp_grp)] > 10.5, main="ATAD2 over expression")
+```
+
+
+# Export results for submission
+
+Here, we define survival groups according to ATAD2 expression.
+Then, we export results for challenge 1 and challenge 2.
+The zip files have to be submit on the coda lab interface > Participate > Submit / View Results > Submit
+
+Warning:  
+
+  - You have only **one** opportunity to submit to Challenge 2, to avoid over fitting.
+  - The Challenge 2 is only reachable after 5pm.
+   
+
+## Challenge 1
+
+```{r}
+# Define groups
+idx = rownames(exp_grp)[exp_grp$sets == "challenge1"]
+grps = data["ATAD2",idx] < 10.5
+names(grps) = idx
+
+# Export grps 
+saveRDS(grps, "grps.rds")
+zip("grps_chal1.zip", "grps.rds")
+```
+
+## Challenge 2
+
+```{r}
+# Define groups
+idx = rownames(exp_grp)[exp_grp$sets == "challenge2"]
+grps = data["ATAD2",idx] < 10.5
+names(grps) = idx
+
+# Export grps 
+saveRDS(grps, "grps.rds")
+zip("grps_chal2.zip", "grps.rds")
+```
+
+# Session Information
+
+```{r, results="verbatim"}
+sessionInfo()
+```
+
+

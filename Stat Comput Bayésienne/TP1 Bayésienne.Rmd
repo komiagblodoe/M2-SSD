@@ -1,0 +1,122 @@
+---
+title: "TP1 Bayésien"
+author: "AGBLODOE Komi/  M2 SSD"
+date: "6 janvier 2020"
+output: pdf_document
+---
+
+
+##Cas gaussien 
+
+On suppose que X ???N(µ,??2) avec ??2 connue. On prend comme loi a priori sur µ, N(µ0,??2). Mettre en place un programme permettant de comparer la loi a posteriori et la loi a priori en faisant varier
+les paramètres du modèle.
+
+
+```{r}
+mu<-2 
+sigma2<-4 
+n<-15 # petite taille d'échantillon
+
+# Définition des hyperparamètres 
+
+mu0<-3 # Notre expert est parfait
+tau2<-1.5 # et fiable
+
+# Simulation d'un échantillon
+
+ech<-rnorm(n,mu,sqrt(sigma2))
+
+xbar<-mean(ech)
+mean.post<-(n*tau2*xbar+sigma2*mu0)/(n*tau2+sigma2) 
+var.post<-sigma2*tau2/(n*tau2+sigma2)
+
+infx<- -3 # valeur min sur l'axe des x 
+supx<- 7 # valeur max sur l'axe des x 
+x<-seq(infx,supx,0.05) # creation d'un vecteur du min au max par pas de 0.1
+
+infy<-0 
+supy<-dnorm(mean.post,mean.post,sqrt(var.post))
+
+hist(ech,freq=FALSE,breaks=10,xlim=c(infx,supx),main = 
+       "Comparaison a priori et a posteriori",ylim = c(infy,supy))
+lines(x,dnorm(x,mu0,sqrt(tau2)),col="red") # loi a priori
+lines(x,dnorm(x,mean.post,sqrt(var.post)),col="blue") # loi a posteriori 
+abline(v=mu,col="green") 
+abline(v=xbar,col="purple") 
+legend(-3,supy,legend=c("A priori", "A posteriori","vraie valeur","MLE"), 
+       col=c("red", "blue","green","purple"), lty=rep(1,4))
+
+```
+
+
+##cas Weibull
+ 
+ 
+ 
+```{r}
+
+n<-20
+eta.vrai<-1000
+beta.vrai<-3
+param.vrai<-c(eta.vrai,beta.vrai)
+
+#eta.mle<-numeric()
+
+#Estimation par logvraissemblance 
+
+#simulation de l'echantillon
+ech<-rweibull(n,shape = beta.vrai,scale = eta.vrai)
+mle.weibull <- function(x,mydata,eta) {
+	n <- length(mydata)
+
+	return(n*log(x/eta) + (x-1)*sum(log(mydata/eta)) -
+	            sum((mydata/eta)^x))
+}
+
+
+est.mle<-optim(c(2), function(x) mle.weibull(x,mydata=ech,eta=1000), control = list(fnscale=-1), method ="BFGS" )
+
+#beta estimé
+beta.mle<-est.mle$par[1]
+
+
+```
+
+```{r}
+ #Mettre en oeuvre un programme permettant de calculer l'estimateur bayésien
+
+
+
+
+
+beta.init<-est.mle$par
+
+
+k<-10000
+ech_beta_bay<-numeric(k)
+ech_beta_bay[1]<-beta.init
+sigma<-1
+beta.star<-NULL
+
+vraiss<-function(eta,beta,ech){
+  ifelse(beta>=1 & beta<=5, log(beta*n) + sum(log(ech/eta)*(beta-1))-sum((ech/eta)*beta), 0)
+
+}
+
+for (i in 2:k){
+  beta.star<-rnorm(1,beta.init,sqrt(sigma))
+  
+  alpha<-min(1,vraiss(1000,beta.star,ech)/vraiss(1000,ech_beta_bay[i-1],ech))
+  
+  u<-runif(1)
+  ech_beta_bay[i]<-beta.star*(u<=alpha) + ech_beta_bay[i-1]*(u>alpha) 
+}
+
+hist(ech_beta_bay[1001:length(ech_beta_bay)],breaks = 100)
+abline(v=beta.init,col='red')
+#beta estimé par la méthode bayésienne 
+beta.moy.bay<-mean(ech_beta_bay[1001:length(ech_beta_bay)])
+
+plot((ech_beta_bay[1001:length(ech_beta_bay)]))
+```
+Comparé au beta trouvé par la vraissemblance (3.63), celui trouvé par la bayésienne est presque le même (3.69)
